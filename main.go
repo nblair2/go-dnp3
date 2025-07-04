@@ -41,7 +41,7 @@ func main() {
 					fmt.Printf("Packet: %d\n", data)
 					fmt.Printf("Packet: %d\n", d.ToBytes())
 				} else {
-					// fmt.Println(d)
+					fmt.Println(d)
 				}
 			}
 		}

@@ -8,7 +8,8 @@ type DNP3Application interface {
 	ToBytes() []byte
 	String() string
 	LayerPayload() []byte
-	SetCTL()
+	SetCTL(DNP3ApplicationControl)
+	SetSequence(uint8) error
 	// HACK because Go doesn't let me do proper OO
 	IsDNP3Application() bool
 }
