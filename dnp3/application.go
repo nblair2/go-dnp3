@@ -274,6 +274,22 @@ func (d *DNP3ApplicationResponse) SetCTL(c DNP3ApplicationControl) {
 	d.CTL = c
 }
 
+func (d *DNP3ApplicationRequest) SetSequence(s uint8) error {
+	if s >= 16 {
+		return fmt.Errorf("application sequence is only 4 bytes, got %d", s)
+	}
+	d.CTL.SEQ = s
+	return nil
+}
+
+func (d *DNP3ApplicationResponse) SetSequence(s uint8) error {
+	if s >= 16 {
+		return fmt.Errorf("application sequence is only 4 bytes, got %d", s)
+	}
+	d.CTL.SEQ = s
+	return nil
+}
+
 // HACK to prevent other types from getting added to DNP3.Application
 func (d DNP3ApplicationRequest) IsDNP3Application() bool {
 	return true
