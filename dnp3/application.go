@@ -8,6 +8,7 @@ type DNP3Application interface {
 	ToBytes() []byte
 	String() string
 	LayerPayload() []byte
+	SetCTL()
 	// HACK because Go doesn't let me do proper OO
 	IsDNP3Application() bool
 }
@@ -263,6 +264,14 @@ func (d DNP3ApplicationRequest) LayerPayload() []byte {
 
 func (d DNP3ApplicationResponse) LayerPayload() []byte {
 	return d.OBJ
+}
+
+func (d *DNP3ApplicationRequest) SetCTL(c DNP3ApplicationControl) {
+	d.CTL = c
+}
+
+func (d *DNP3ApplicationResponse) SetCTL(c DNP3ApplicationControl) {
+	d.CTL = c
 }
 
 // HACK to prevent other types from getting added to DNP3.Application
