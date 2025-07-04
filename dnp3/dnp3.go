@@ -16,7 +16,6 @@ type DNP3 struct {
 	DataLink    DNP3DataLink
 	Transport   DNP3Transport
 	Application DNP3Application
-	raw         []byte
 }
 
 // DNP3Type (required by gopacket)
@@ -34,12 +33,12 @@ func (d DNP3) LayerType() gopacket.LayerType {
 
 // All DNP3 layer bytes (required by gopacket)
 func (d DNP3) LayerContents() []byte {
-	return d.raw
+	return d.ToBytes()
 }
 
 // DNP3 application object bytes (required by gopacket)
 func (d DNP3) LayerPayload() []byte {
-	return d.Application.OBJ
+	return d.Application.LayerPayload()
 }
 
 // helper to bridge gopacket and DecodeFromBytes
@@ -56,13 +55,15 @@ func decodeDNP3(data []byte, p gopacket.PacketBuilder) error {
 // DecodeFromBytes creates a DNP3 object with appropriate layers based on the
 // bytes slice passed to it. Needs at least 10 bytes.
 func (d *DNP3) DecodeFromBytes(data []byte) error {
+	var (
+		err   error
+		clean []byte
+	)
 	if len(data) < 10 {
 		return fmt.Errorf(
 			"not DNP3, only got %d bytes (need at least 10)", len(data))
 	}
 
-	var err error
-	d.raw = data
 	if d.DataLink, err = NewDNP3DataLink(data[:10]); err != nil {
 		return fmt.Errorf("can't create DNP3DataLink layer: %w", err)
 	}
@@ -72,18 +73,42 @@ func (d *DNP3) DecodeFromBytes(data []byte) error {
 		return nil
 	}
 
-	d.Transport = NewDNP3Transport(data[10])
+	d.Transport, clean, err = NewDNP3Transport(data[10:])
+	if err != nil {
+		return fmt.Errorf("")
+	}
 
 	// No application?
-	if len(data) == 11 {
+	if len(clean) <= 0 {
 		return nil
 	}
 
-	d.Application = NewDNP3Application(data[11:])
+	if d.DataLink.CTL.DIR {
+		d.Application = NewDNP3ApplicationRequest(clean)
+	} else {
+		d.Application = NewDNP3ApplicationResponse(clean)
+	}
 
 	return nil
 }
 
+// ToBytes assembles the DNP3 packet as bytes, in order. It also performs some
+// updates to ensure the SYN, LEN, and CRCs are set correctly based on the
+// current data
+func (d *DNP3) ToBytes() []byte {
+	var ta []byte
+
+	// get these first, for LEN in DL
+	ta = append(d.Transport.ToBytes(), d.Application.ToBytes()[:]...)
+	// len is 5 more bytes in DL, excludes CRCs
+	d.DataLink.LEN = uint16(len(ta) + 5)
+
+	ta = InsertDNP3CRCs(ta)
+
+	return append(d.DataLink.ToBytes(), ta[:]...)
+}
+
+// String outputs the DNP3 packet as an indented string
 func (d DNP3) String() string {
 	return "DNP3:" +
 		d.DataLink.String() +

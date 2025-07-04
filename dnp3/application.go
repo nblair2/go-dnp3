@@ -2,17 +2,32 @@ package dnp3
 
 import "fmt"
 
-// DNP3Application is the lowest layer of DNP3, and carries all of the
-// data. The application layer is complex.
-type DNP3Application struct {
+// DNP3Application Message abstraction for different Request / Response
+// structure
+type DNP3Application interface {
+	ToBytes() []byte
+	String() string
+	LayerPayload() []byte
+	// HACK because Go doesn't let me do proper OO
+	IsDNP3Application() bool
+}
+
+// DNP3ApplicationRequest is sent from the master to the outstation
+type DNP3ApplicationRequest struct {
+	CTL DNP3ApplicationControl
+	FC  byte
+	Raw []byte // Not sure what these are...
+}
+
+// DNP3ApplicationResponse is sent from outstation to master
+type DNP3ApplicationResponse struct {
 	CTL DNP3ApplicationControl
 	FC  byte
 	IIN DNP3ApplicationIIN
 	OBJ []byte // Store all the data here for now
 }
 
-// DNP3ApplicationControl is the first byte of the application layer, and
-// is used to keep application messages synchronized across frames
+// DNP3ApplicationCOntrol is a common header byte for both application types
 type DNP3ApplicationControl struct {
 	FIR bool
 	FIN bool
@@ -21,7 +36,7 @@ type DNP3ApplicationControl struct {
 	SEQ uint8 //only 4 bits
 }
 
-// DNP3ApplicationIIN communicate information about the state of the device
+// DNP3ApplicationResponse header contains
 type DNP3ApplicationIIN struct {
 	// IIN 1
 	AllStations   bool
@@ -39,13 +54,20 @@ type DNP3ApplicationIIN struct {
 	BufferOverflow   bool
 	AlreadyExiting   bool
 	BadConfiguration bool
-	Reserved1        bool
-	Reserved2        bool
+	Reserved1        bool // Should always be set to 0, not enforced
+	Reserved2        bool // ^
 }
 
-// NewDNP3Application parses and builds the DNP3 Application layer
-func NewDNP3Application(d []byte) DNP3Application {
-	return DNP3Application{
+func NewDNP3ApplicationRequest(d []byte) DNP3ApplicationRequest {
+	return DNP3ApplicationRequest{
+		CTL: NewDNP3ApplicationControl(d[0]),
+		FC:  d[1],
+		Raw: d[2:],
+	}
+}
+
+func NewDNP3ApplicationResponse(d []byte) DNP3ApplicationResponse {
+	return DNP3ApplicationResponse{
 		CTL: NewDNP3ApplicationControl(d[0]),
 		FC:  d[1],
 		IIN: NewDNP3ApplicationIIN(d[2], d[3]),
@@ -66,29 +88,132 @@ func NewDNP3ApplicationControl(b byte) DNP3ApplicationControl {
 func NewDNP3ApplicationIIN(lsb, msb byte) DNP3ApplicationIIN {
 	return DNP3ApplicationIIN{
 		// IIN 1
-		AllStations:   (lsb & 0b10000000) != 0,
-		Class1Events:  (lsb & 0b01000000) != 0,
-		Class2Events:  (lsb & 0b00100000) != 0,
-		Class3Events:  (lsb & 0b00010000) != 0,
-		NeedTime:      (lsb & 0b00001000) != 0,
-		Local:         (lsb & 0b00000100) != 0,
-		DeviceTrouble: (lsb & 0b00000010) != 0,
-		Restart:       (lsb & 0b00000001) != 0,
+		AllStations:   (lsb & 0b00000001) != 0,
+		Class1Events:  (lsb & 0b00000010) != 0,
+		Class2Events:  (lsb & 0b00000100) != 0,
+		Class3Events:  (lsb & 0b00001000) != 0,
+		NeedTime:      (lsb & 0b00010000) != 0,
+		Local:         (lsb & 0b00100000) != 0,
+		DeviceTrouble: (lsb & 0b01000000) != 0,
+		Restart:       (lsb & 0b10000000) != 0,
 		// IIN 2
-		BadFunction:      (msb & 0b10000000) != 0,
-		ObjectUnknown:    (msb & 0b01000000) != 0,
-		ParameterError:   (msb & 0b00100000) != 0,
-		BufferOverflow:   (msb & 0b00010000) != 0,
-		AlreadyExiting:   (msb & 0b00001000) != 0,
-		BadConfiguration: (msb & 0b00000100) != 0,
-		Reserved1:        (msb & 0b00000010) != 0,
-		Reserved2:        (msb & 0b00000001) != 0,
+		BadFunction:      (msb & 0b00000001) != 0,
+		ObjectUnknown:    (msb & 0b00000010) != 0,
+		ParameterError:   (msb & 0b00000100) != 0,
+		BufferOverflow:   (msb & 0b00001000) != 0,
+		AlreadyExiting:   (msb & 0b00010000) != 0,
+		BadConfiguration: (msb & 0b00100000) != 0,
+		Reserved1:        (msb & 0b01000010) != 0,
+		Reserved2:        (msb & 0b10000000) != 0,
 	}
 }
 
-func (d DNP3Application) String() string {
+func (d DNP3ApplicationRequest) ToBytes() []byte {
+	return append(append(d.CTL.ToBytes(), d.FC), d.Raw[:]...)
+}
+
+func (d DNP3ApplicationResponse) ToBytes() []byte {
+	var out []byte
+
+	out = append(out, d.CTL.ToBytes()[:]...)
+	out = append(out, d.FC)
+	out = append(out, d.IIN.ToBytes()[:]...)
+	out = append(out, d.OBJ[:]...)
+
+	return out
+}
+
+func (d *DNP3ApplicationControl) ToBytes() []byte {
+	var b byte = 0
+
+	if d.FIR {
+		b |= 0b10000000
+	}
+	if d.FIN {
+		b |= 0b01000000
+	}
+	if d.CON {
+		b |= 0b00100000
+	}
+	if d.UNS {
+		b |= 0b00010000
+	}
+
+	b |= (d.SEQ & 0b00001111)
+
+	return []byte{b}
+}
+
+func (d *DNP3ApplicationIIN) ToBytes() []byte {
+	var lsb, msb byte
+
+	// IIN 1 (lsb)
+	if d.AllStations {
+		lsb |= 0b00000001
+	}
+	if d.Class1Events {
+		lsb |= 0b00000010
+	}
+	if d.Class2Events {
+		lsb |= 0b00000100
+	}
+	if d.Class3Events {
+		lsb |= 0b00001000
+	}
+	if d.NeedTime {
+		lsb |= 0b00010000
+	}
+	if d.Local {
+		lsb |= 0b00100000
+	}
+	if d.DeviceTrouble {
+		lsb |= 0b01000000
+	}
+	if d.Restart {
+		lsb |= 0b10000000
+	}
+
+	// IIN 2 (msb)
+	if d.BadFunction {
+		msb |= 0b00000001
+	}
+	if d.ObjectUnknown {
+		msb |= 0b01000010
+	}
+	if d.ParameterError {
+		msb |= 0b00000100
+	}
+	if d.BufferOverflow {
+		msb |= 0b00001000
+	}
+	if d.AlreadyExiting {
+		msb |= 0b00010000
+	}
+	if d.BadConfiguration {
+		msb |= 0b00100000
+	}
+	if d.Reserved1 {
+		msb |= 0b01000000
+	}
+	if d.Reserved2 {
+		msb |= 0b10000000
+	}
+
+	return []byte{lsb, msb}
+}
+
+func (d DNP3ApplicationRequest) String() string {
 	return fmt.Sprintf(`
-	Application:
+	Application (Request):
+		%s
+		FC : %d
+		Raw: 0x % X`,
+		d.CTL.String(), d.FC, d.Raw)
+}
+
+func (d DNP3ApplicationResponse) String() string {
+	return fmt.Sprintf(`
+	Application (Response):
 		%s
 		FC : %d
 		%s 
@@ -130,4 +255,22 @@ func (d DNP3ApplicationIIN) String() string {
 		d.NeedTime, d.Local, d.DeviceTrouble, d.Restart, d.BadFunction,
 		d.ObjectUnknown, d.ParameterError, d.BufferOverflow, d.AlreadyExiting,
 		d.BadConfiguration, d.Reserved1, d.Reserved2)
+}
+
+func (d DNP3ApplicationRequest) LayerPayload() []byte {
+	return d.Raw
+}
+
+func (d DNP3ApplicationResponse) LayerPayload() []byte {
+	return d.OBJ
+}
+
+// HACK to prevent other types from getting added to DNP3.Application
+func (d DNP3ApplicationRequest) IsDNP3Application() bool {
+	return true
+}
+
+// HACK to prevent other types from getting added to DNP3.Application
+func (d DNP3ApplicationResponse) IsDNP3Application() bool {
+	return true
 }
