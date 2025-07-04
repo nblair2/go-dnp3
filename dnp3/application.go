@@ -8,8 +8,9 @@ type DNP3Application interface {
 	ToBytes() []byte
 	String() string
 	LayerPayload() []byte
-	// SetCTL(DNP3ApplicationControl)
-	// SetSequence(uint8) error
+	SetCTL(DNP3ApplicationControl)
+	SetSequence(uint8) error
+	SetContents([]byte)
 	// HACK because Go doesn't let me do proper OO
 	IsDNP3Application() bool
 }
@@ -289,6 +290,14 @@ func (d *DNP3ApplicationResponse) SetSequence(s uint8) error {
 	}
 	d.CTL.SEQ = s
 	return nil
+}
+
+func (d *DNP3ApplicationRequest) SetContents(data []byte) {
+	d.Raw = data
+}
+
+func (d *DNP3ApplicationResponse) SetContents(data []byte) {
+	d.OBJ = data
 }
 
 // HACK to prevent other types from getting added to DNP3.Application
