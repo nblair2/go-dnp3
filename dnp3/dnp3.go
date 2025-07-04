@@ -84,11 +84,9 @@ func (d *DNP3) DecodeFromBytes(data []byte) error {
 	}
 
 	if d.DataLink.CTL.DIR {
-		a := NewDNP3ApplicationRequest(clean)
-		d.Application = &a
+		d.Application = NewDNP3ApplicationRequest(clean)
 	} else {
-		a := NewDNP3ApplicationResponse(clean)
-		d.Application = &a
+		d.Application = NewDNP3ApplicationResponse(clean)
 	}
 
 	return nil

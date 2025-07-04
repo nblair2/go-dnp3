@@ -8,10 +8,9 @@ type DNP3Application interface {
 	ToBytes() []byte
 	String() string
 	LayerPayload() []byte
-	// SetCTL(DNP3ApplicationControl)
-	// SetSequence(uint8) error
-	// SetContents([]byte)
-	// HACK because Go doesn't let me do proper OO
+	SetSequence(uint8) error
+	SetContents([]byte)
+	// HACK because Go doesn't let me do proper inheritance
 	IsDNP3Application() bool
 }
 
@@ -61,16 +60,16 @@ type DNP3ApplicationIIN struct {
 	Reserved2        bool // ^
 }
 
-func NewDNP3ApplicationRequest(d []byte) DNP3ApplicationRequest {
-	return DNP3ApplicationRequest{
+func NewDNP3ApplicationRequest(d []byte) *DNP3ApplicationRequest {
+	return &DNP3ApplicationRequest{
 		CTL: NewDNP3ApplicationControl(d[0]),
 		FC:  d[1],
 		Raw: d[2:],
 	}
 }
 
-func NewDNP3ApplicationResponse(d []byte) DNP3ApplicationResponse {
-	return DNP3ApplicationResponse{
+func NewDNP3ApplicationResponse(d []byte) *DNP3ApplicationResponse {
+	return &DNP3ApplicationResponse{
 		CTL: NewDNP3ApplicationControl(d[0]),
 		FC:  d[1],
 		IIN: NewDNP3ApplicationIIN(d[2], d[3]),
@@ -268,26 +267,20 @@ func (d DNP3ApplicationResponse) LayerPayload() []byte {
 	return d.OBJ
 }
 
-func (d *DNP3ApplicationRequest) SetCTL(c DNP3ApplicationControl) {
-	d.CTL = c
-}
-
-func (d *DNP3ApplicationResponse) SetCTL(c DNP3ApplicationControl) {
-	d.CTL = c
-}
-
-func (d *DNP3ApplicationRequest) SetSequence(s uint8) error {
-	if s >= 16 {
+func (d DNP3ApplicationRequest) SetSequence(s uint8) error {
+	if s >= 0b00001111 {
 		return fmt.Errorf("application sequence is only 4 bytes, got %d", s)
 	}
+
 	d.CTL.SEQ = s
 	return nil
 }
 
-func (d *DNP3ApplicationResponse) SetSequence(s uint8) error {
-	if s >= 16 {
+func (d DNP3ApplicationResponse) SetSequence(s uint8) error {
+	if s >= 0b00001111 {
 		return fmt.Errorf("application sequence is only 4 bytes, got %d", s)
 	}
+
 	d.CTL.SEQ = s
 	return nil
 }
