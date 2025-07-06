@@ -20,8 +20,11 @@ func main() {
 	defer handle.Close()
 
 	pcap := gopacket.NewPacketSource(handle, handle.LinkType())
+	i := 1
 	for pkt := range pcap.Packets() {
 
+		fmt.Printf("Packet: %d\n", i)
+		i += 1
 		tcpLayer := pkt.Layer(layers.LayerTypeTCP)
 		if tcpLayer != nil {
 
@@ -30,7 +33,7 @@ func main() {
 			if len(data) >= 10 {
 
 				var d dnp3.DNP3
-				err := d.DecodeFromBytes(data)
+				err := d.FromBytes(data)
 				if err != nil {
 					fmt.Println(err)
 					continue
@@ -41,7 +44,8 @@ func main() {
 					fmt.Printf("Packet: %d\n", data)
 					fmt.Printf("Packet: %d\n", d.ToBytes())
 				} else {
-					fmt.Println(d)
+					// fmt.Print(d)
+					fmt.Println(d.String())
 				}
 			}
 		}

@@ -13,9 +13,9 @@ import (
 // The protocol consists of three layers: A data link layer, a transport layer,
 // and an application layer.
 type DNP3 struct {
-	DataLink    DNP3DataLink
-	Transport   DNP3Transport
-	Application DNP3Application
+	DataLink    DataLink
+	Transport   Transport
+	Application Application
 }
 
 // DNP3Type (required by gopacket)
@@ -27,24 +27,24 @@ var DNP3Type = gopacket.RegisterLayerType(20000,
 )
 
 // DNP3Layer type (required by gopacket)
-func (d DNP3) LayerType() gopacket.LayerType {
+func (DNP3) LayerType() gopacket.LayerType {
 	return DNP3Type
 }
 
 // All DNP3 layer bytes (required by gopacket)
-func (d DNP3) LayerContents() []byte {
-	return d.ToBytes()
+func (dnp3 DNP3) LayerContents() []byte {
+	return dnp3.ToBytes()
 }
 
 // DNP3 application object bytes (required by gopacket)
-func (d DNP3) LayerPayload() []byte {
-	return d.Application.LayerPayload()
+func (dnp3 DNP3) LayerPayload() []byte {
+	return dnp3.Application.ToBytes()
 }
 
-// helper to bridge gopacket and DecodeFromBytes
+// helper to bridge gopacket and FromBytes
 func decodeDNP3(data []byte, p gopacket.PacketBuilder) error {
 	var d DNP3
-	if err := d.DecodeFromBytes(data); err != nil {
+	if err := d.FromBytes(data); err != nil {
 		return fmt.Errorf("decoding DNP3 from bytes: %w", err)
 	}
 
@@ -52,20 +52,20 @@ func decodeDNP3(data []byte, p gopacket.PacketBuilder) error {
 	return nil
 }
 
-// DecodeFromBytes creates a DNP3 object with appropriate layers based on the
+// FromBytes creates a DNP3 object with appropriate layers based on the
 // bytes slice passed to it. Needs at least 10 bytes.
-func (d *DNP3) DecodeFromBytes(data []byte) error {
+func (dnp3 *DNP3) FromBytes(data []byte) error {
 	var (
 		err   error
 		clean []byte
 	)
 	if len(data) < 10 {
-		return fmt.Errorf(
-			"not DNP3, only got %d bytes (need at least 10)", len(data))
+		return fmt.Errorf("not DNP3, only got %d bytes (need at least 10)",
+			len(data))
 	}
 
-	if d.DataLink, err = NewDNP3DataLink(data[:10]); err != nil {
-		return fmt.Errorf("can't create DNP3DataLink layer: %w", err)
+	if err = dnp3.DataLink.FromBytes(data[:10]); err != nil {
+		return fmt.Errorf("can't create DNP3 DataLink layer: %w", err)
 	}
 
 	// No transport or application
@@ -73,9 +73,8 @@ func (d *DNP3) DecodeFromBytes(data []byte) error {
 		return nil
 	}
 
-	d.Transport, clean, err = NewDNP3Transport(data[10:])
-	if err != nil {
-		return fmt.Errorf("")
+	if clean, err = dnp3.Transport.FromBytes(data[10:]); err != nil {
+		return fmt.Errorf("can't create DNP3 Transport layer: %w", err)
 	}
 
 	// No application?
@@ -83,11 +82,12 @@ func (d *DNP3) DecodeFromBytes(data []byte) error {
 		return nil
 	}
 
-	if d.DataLink.CTL.DIR {
-		d.Application = NewDNP3ApplicationRequest(clean)
+	if dnp3.DataLink.CTL.DIR {
+		dnp3.Application = &ApplicationRequest{}
 	} else {
-		d.Application = NewDNP3ApplicationResponse(clean)
+		dnp3.Application = &ApplicationResponse{}
 	}
+	dnp3.Application.FromBytes(clean)
 
 	return nil
 }
@@ -95,23 +95,34 @@ func (d *DNP3) DecodeFromBytes(data []byte) error {
 // ToBytes assembles the DNP3 packet as bytes, in order. It also performs some
 // updates to ensure the SYN, LEN, and CRCs are set correctly based on the
 // current data
-func (d *DNP3) ToBytes() []byte {
+func (dnp3 *DNP3) ToBytes() []byte {
 	var ta []byte
 
 	// get these first, for LEN in DL
-	ta = append(d.Transport.ToBytes(), d.Application.ToBytes()[:]...)
+	ta = append(ta, dnp3.Transport.ToByte())
+	ta = append(ta, dnp3.Application.ToBytes()...)
 	// len is 5 more bytes in DL, excludes CRCs
-	d.DataLink.LEN = uint16(len(ta) + 5)
+	dnp3.DataLink.LEN = uint16(len(ta) + 5)
 
 	ta = InsertDNP3CRCs(ta)
 
-	return append(d.DataLink.ToBytes(), ta[:]...)
+	return append(dnp3.DataLink.ToBytes(), ta[:]...)
 }
 
 // String outputs the DNP3 packet as an indented string
-func (d DNP3) String() string {
-	return "DNP3:" +
-		d.DataLink.String() +
-		d.Transport.String() +
-		d.Application.String()
+func (dnp3 *DNP3) String() string {
+	return fmt.Sprintf("DNP3:%s%s%s",
+		dnp3.DataLink.String(),
+		dnp3.Transport.String(),
+		dnp3.Application.String())
+}
+
+// DNP3 Application layer abstraction for different Request / Response
+// structure
+type Application interface {
+	FromBytes([]byte) error
+	ToBytes() []byte
+	String() string
+	SetSequence(uint8) error
+	SetContents([]byte)
 }

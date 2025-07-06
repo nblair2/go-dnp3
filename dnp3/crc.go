@@ -57,7 +57,7 @@ func CalculateDNP3CRC(data []byte) []byte {
 
 // InsertDNP3CRCs calculates and inserts the 2 byte DNP3 CRC after each 16 byte
 // block in the byte slice passed. A compliment to RemoveDNP3CRCs, this is used
-// in the ToBytes function to add CRCs like the transport layer would in the
+// in the ToBytes function to add CRCs like the transport layer would in
 // application data.
 func InsertDNP3CRCs(data []byte) []byte {
 	const blockSize = 16
@@ -76,7 +76,7 @@ func InsertDNP3CRCs(data []byte) []byte {
 
 // RemoveDNP3CRCs checks and removes the 2 byte DNP3 CRC after each 16 byte
 // block in the arbitrary length byte slice passed. A compliment to
-// InsertDNP3CRCs, this is used in the DecodeFromBytes function to remove
+// InsertDNP3CRCs, this is used in the FromBytes function to remove
 // CRCs inserted by the Transport layer and get the raw application bytes.
 func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 	const (
