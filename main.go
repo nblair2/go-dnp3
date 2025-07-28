@@ -23,7 +23,6 @@ func main() {
 	i := 1
 	for pkt := range pcap.Packets() {
 
-		fmt.Printf("Packet: %d\n", i)
 		i += 1
 		tcpLayer := pkt.Layer(layers.LayerTypeTCP)
 		if tcpLayer != nil {
@@ -39,14 +38,15 @@ func main() {
 					continue
 				}
 
-				if !slices.Equal(d.ToBytes(), data) {
+				fmt.Printf("Packet: %d\n", i)
+
+				bytes := d.ToBytes()
+				if !slices.Equal(bytes, data) {
 					fmt.Println("Packet did not match")
-					fmt.Printf("Packet: %d\n", data)
-					fmt.Printf("Packet: %d\n", d.ToBytes())
-				} else {
-					// fmt.Print(d)
-					fmt.Println(d.String())
 				}
+				fmt.Printf("Packet raw data:     0x % X\n", data)
+				fmt.Printf("Packet dnp3.ToBytes: 0x % X\n", bytes)
+				fmt.Println(d.String())
 			}
 		}
 	}

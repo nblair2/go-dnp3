@@ -8,7 +8,5 @@ This is better than the [Scapy DNP3](https://github.com/nrodofile/ScapyDNP3_lib)
 
 ### Improvements
 
-* [ ] Currently hangs parsing packet 91 of example (binary points)
-* [ ] Points are read out as []byte, including their indexes, flags, etc.
-* [ ] Support for Binary points
-* [ ] Support for more common groups and variations 
+* build out custom Group/Variation structs so we can interpret the data better
+* the couple of times we are are getting a "raw" / extra are from bad packets (a reserved field is set)

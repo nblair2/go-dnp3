@@ -15,7 +15,9 @@ func (appreq *ApplicationRequest) FromBytes(d []byte) error {
 
 	appreq.CTL.FromByte(d[0])
 	appreq.FC = RequestFC(d[1])
-	appreq.Data.FromBytes(d[2:])
+	if err := appreq.Data.FromBytes(d[2:]); err != nil {
+		fmt.Printf("error decoding: %v\n", err)
+	}
 	return nil
 }
 

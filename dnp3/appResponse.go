@@ -200,12 +200,11 @@ func (appiin *ApplicationIIN) String() string {
 			ParameterError  : %t
 			BufferOverflow  : %t
 			AlreadyExiting  : %t
-			BadConfiguration: %t
-			Reserved1       : %t
-			Reserved2       : %t`,
+			BadConfiguration: %t`,
 		appiin.AllStations, appiin.Class1Events, appiin.Class2Events,
 		appiin.Class3Events, appiin.NeedTime, appiin.Local, appiin.DeviceTrouble,
 		appiin.Restart, appiin.BadFunction, appiin.ObjectUnknown,
 		appiin.ParameterError, appiin.BufferOverflow, appiin.AlreadyExiting,
-		appiin.BadConfiguration, appiin.Reserved1, appiin.Reserved2)
+		appiin.BadConfiguration,
+	)
 }
