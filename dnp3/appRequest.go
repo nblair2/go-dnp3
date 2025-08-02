@@ -42,14 +42,25 @@ func (appreq *ApplicationRequest) String() string {
 	return o
 }
 
+func (appreq *ApplicationRequest) GetSequence() uint8 {
+	return appreq.CTL.SEQ
+}
+
 func (appreq *ApplicationRequest) SetSequence(s uint8) error {
 	if s >= 0b00001111 {
-		return fmt.Errorf("application sequence is only 4 bytes, got %d", s)
+		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
 	}
 	appreq.CTL.SEQ = s
 	return nil
 }
 
+func (appreq *ApplicationRequest) GetFunctionCode() byte {
+	return byte(appreq.FC)
+}
+
+func (appreq *ApplicationRequest) SetFunctionCode(d byte) {
+	appreq.FC = RequestFC(d)
+}
 func (appreq *ApplicationRequest) GetData() []byte {
 	return appreq.Data.ToBytes()
 }
@@ -61,7 +72,7 @@ func (appreq *ApplicationRequest) SetData(data []byte) error {
 
 // DNP3 Application RequestFC specify the action the master is directing the
 // outstation to take
-type RequestFC uint16
+type RequestFC byte
 
 const (
 	Confirm RequestFC = iota // 0x0

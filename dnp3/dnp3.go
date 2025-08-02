@@ -123,7 +123,10 @@ type Application interface {
 	FromBytes([]byte) error
 	ToBytes() []byte
 	String() string
+	GetSequence() uint8
 	SetSequence(uint8) error
+	GetFunctionCode() byte
+	SetFunctionCode(byte)
 	GetData() []byte
 	SetData([]byte) error
 }

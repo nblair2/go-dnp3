@@ -46,6 +46,26 @@ func (appresp *ApplicationResponse) String() string {
 	return o
 }
 
+func (appresp *ApplicationResponse) GetSequence() uint8 {
+	return appresp.CTL.SEQ
+}
+
+func (appresp *ApplicationResponse) SetSequence(s uint8) error {
+	if s >= 0b00001111 {
+		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
+	}
+	appresp.CTL.SEQ = s
+	return nil
+}
+
+func (appresp *ApplicationResponse) GetFunctionCode() byte {
+	return byte(appresp.FC)
+}
+
+func (appresp *ApplicationResponse) SetFunctionCode(d byte) {
+	appresp.FC = ResponseFC(d)
+}
+
 func (appresp *ApplicationResponse) GetData() []byte {
 	return appresp.Data.ToBytes()
 }
@@ -55,16 +75,8 @@ func (appresp *ApplicationResponse) SetData(data []byte) error {
 	return err
 }
 
-func (appresp *ApplicationResponse) SetSequence(s uint8) error {
-	if s >= 0b00001111 {
-		return fmt.Errorf("application sequence is only 4 bytes, got %d", s)
-	}
-	appresp.CTL.SEQ = s
-	return nil
-}
-
 // DNP3 Application ResponseFC specify the action the outstation is taking
-type ResponseFC uint16
+type ResponseFC byte
 
 const (
 	Response ResponseFC = iota + 0x81
