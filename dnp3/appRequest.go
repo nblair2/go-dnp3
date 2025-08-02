@@ -50,8 +50,13 @@ func (appreq *ApplicationRequest) SetSequence(s uint8) error {
 	return nil
 }
 
-func (appreq *ApplicationRequest) SetContents(d []byte) {
-	appreq.Data.FromBytes(d)
+func (appreq *ApplicationRequest) GetData() []byte {
+	return appreq.Data.ToBytes()
+}
+
+func (appreq *ApplicationRequest) SetData(data []byte) error {
+	err := appreq.Data.FromBytes(data)
+	return err
 }
 
 // DNP3 Application RequestFC specify the action the master is directing the

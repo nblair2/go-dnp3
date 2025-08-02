@@ -124,5 +124,6 @@ type Application interface {
 	ToBytes() []byte
 	String() string
 	SetSequence(uint8) error
-	SetContents([]byte)
+	GetData() []byte
+	SetData([]byte) error
 }

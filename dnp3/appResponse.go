@@ -46,8 +46,13 @@ func (appresp *ApplicationResponse) String() string {
 	return o
 }
 
-func (appresp *ApplicationResponse) SetContents(d []byte) {
-	appresp.Data.FromBytes(d)
+func (appresp *ApplicationResponse) GetData() []byte {
+	return appresp.Data.ToBytes()
+}
+
+func (appresp *ApplicationResponse) SetData(data []byte) error {
+	err := appresp.Data.FromBytes(data)
+	return err
 }
 
 func (appresp *ApplicationResponse) SetSequence(s uint8) error {

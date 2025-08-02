@@ -13,6 +13,7 @@ type ApplicationData struct {
 }
 
 func (ad *ApplicationData) FromBytes(d []byte) error {
+	ad.OBJS = nil // in case there was already stuff here
 	for i := 0; i < len(d); {
 		var obj DataObject
 		if err := obj.FromBytes(d[i:]); err != nil {
