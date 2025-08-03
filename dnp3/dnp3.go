@@ -100,7 +100,10 @@ func (dnp3 *DNP3) ToBytes() []byte {
 
 	// get these first, for LEN in DL
 	ta = append(ta, dnp3.Transport.ToByte())
-	ta = append(ta, dnp3.Application.ToBytes()...)
+	// Application isn't always set
+	if dnp3.Application != nil {
+		ta = append(ta, dnp3.Application.ToBytes()...)
+	}
 	// len is 5 more bytes in DL, excludes CRCs
 	dnp3.DataLink.LEN = uint16(len(ta) + 5)
 
