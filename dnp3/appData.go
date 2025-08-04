@@ -72,7 +72,9 @@ func (do *DataObject) FromBytes(d []byte) error {
 	offset := do.Header.SizeOf()
 
 	psBits := do.calcPointBitSize()
-	if psBits%8 == 0 {
+	if psBits == 0 {
+		return fmt.Errorf("can't parse this Group/Var")
+	} else if psBits%8 == 0 {
 		ps := psBits / 8
 		ps += do.Header.calcPrefixSize()
 		for range do.Header.RangeField.NumObjects() {
