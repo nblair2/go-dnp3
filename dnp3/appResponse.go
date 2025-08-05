@@ -71,6 +71,7 @@ func (appresp *ApplicationResponse) GetData() []byte {
 }
 
 func (appresp *ApplicationResponse) SetData(data []byte) error {
+	appresp.Data = ApplicationData{}
 	err := appresp.Data.FromBytes(data)
 	return err
 }

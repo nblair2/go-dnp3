@@ -66,6 +66,7 @@ func (appreq *ApplicationRequest) GetData() []byte {
 }
 
 func (appreq *ApplicationRequest) SetData(data []byte) error {
+	appreq.Data = ApplicationData{}
 	err := appreq.Data.FromBytes(data)
 	return err
 }
