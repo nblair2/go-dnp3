@@ -16,17 +16,21 @@ func (appreq *ApplicationRequest) FromBytes(d []byte) error {
 	appreq.CTL.FromByte(d[0])
 	appreq.FC = RequestFC(d[1])
 	if err := appreq.Data.FromBytes(d[2:]); err != nil {
-		fmt.Printf("error decoding: %v\n", err)
+		return fmt.Errorf("couldn't create AppReq Data FromBytes: %v", err)
 	}
 	return nil
 }
 
-func (appreq *ApplicationRequest) ToBytes() []byte {
+func (appreq *ApplicationRequest) ToBytes() ([]byte, error) {
 	var o []byte
 	o = append(o, appreq.CTL.ToByte())
 	o = append(o, byte(appreq.FC))
-	o = append(o, appreq.Data.ToBytes()...)
-	return o
+	b, err := appreq.Data.ToBytes()
+	if err != nil {
+		return o, fmt.Errorf("couldn't convert AppReq Data ToBytes: %v", err)
+	}
+	o = append(o, b...)
+	return o, nil
 }
 
 func (appreq *ApplicationRequest) String() string {
@@ -40,6 +44,14 @@ func (appreq *ApplicationRequest) String() string {
 		o += "\n\t\t" + d
 	}
 	return o
+}
+
+func (appreq *ApplicationRequest) GetCTL() ApplicationCTL {
+	return appreq.CTL
+}
+
+func (appreq *ApplicationRequest) SetCTL(ctl ApplicationCTL) {
+	appreq.CTL = ctl
 }
 
 func (appreq *ApplicationRequest) GetSequence() uint8 {
@@ -61,13 +73,12 @@ func (appreq *ApplicationRequest) GetFunctionCode() byte {
 func (appreq *ApplicationRequest) SetFunctionCode(d byte) {
 	appreq.FC = RequestFC(d)
 }
-func (appreq *ApplicationRequest) GetData() []byte {
-	return appreq.Data.ToBytes()
+func (appreq *ApplicationRequest) GetData() ApplicationData {
+	return appreq.Data
 }
 
-func (appreq *ApplicationRequest) SetData(data []byte) error {
-	err := appreq.Data.FromBytes(data)
-	return err
+func (appreq *ApplicationRequest) SetData(d ApplicationData) {
+	appreq.Data = d
 }
 
 // DNP3 Application RequestFC specify the action the master is directing the

@@ -1,6 +1,24 @@
 package dnp3
 
-import "fmt"
+import (
+	"fmt"
+)
+
+// DNP3 Application layer abstraction for different Request / Response
+// structure
+type Application interface {
+	FromBytes([]byte) error
+	ToBytes() ([]byte, error)
+	String() string
+	GetCTL() ApplicationCTL
+	SetCTL(ApplicationCTL)
+	GetSequence() uint8
+	SetSequence(uint8) error
+	GetFunctionCode() byte
+	SetFunctionCode(byte)
+	GetData() ApplicationData
+	SetData(ApplicationData)
+}
 
 // ApplicationCTL
 // a common header byte for both application types

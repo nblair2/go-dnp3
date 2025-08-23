@@ -1,12 +1,25 @@
 # go-dnp3
 
-Partial DNP3 layer for gopacket.
+DNP3 parsing in go.
+* **`FromBytes([]byte)`** to parse a byte slice and interpret it as DNP3
+* **`ToBytes()`** to go from a struct back to bytes (calculates length, calculates and inserts CRCs on the way)
+* **`String()`** to get packet as human-readable indented string (Reserved and CRCs not shown)
+* **`json.MarshalIndent(dnp, "", "  ")`** to get packet as machine-friendly 
 
-### Status
+## Improvements
 
-This is better than the [Scapy DNP3](https://github.com/nrodofile/ScapyDNP3_lib) implementation which stops at the application data, but not as good as the [C++ (archived)](https://github.com/dnp3/opendnp3) / [Rust (paid)](https://github.com/stepfunc/dnp3) OpenDNP3 implementations. 
+* [ ] consistency on plural / singular of bits / bit and bytes / byte. Functions and attributes should be named based on what they actually are, and be as small as possible
+* [ ] errors always available / checked in `FromBytes` and `ToBytes` methods. Should buble these up but not fail if possible.
+* [ ] re-write a generic `Point` called `PointBytes` with flags and all possible fields (`Prefix`, `Flags`, `AbsTime`, `RelTime`) rather than the many different types we have now
+* [ ] clean up the the `String` method so we aren't always appending newlines, these should be the responsibility of the caller
+* [ ] consolidate the 3 different massive switch statements for Group / Variation into one
+* [ ] Always more point improvements (Events / Quality, Prefix parsing)
+* [ ] `DIR` field / `PRM`
 
-### Improvements
+## Test
 
-* build out custom Group/Variation structs so we can interpret the data better
-* the couple of times we are are getting a "raw" / extra are from bad packets (a reserved field is set)
+Run `make test` to check `examples/*.pcap` for errors. Data taken from [opendnp3 conformance reports](https://dnp3.github.io/conformance/report.html) and [ITI ICS Security Tools Repository](https://github.com/ITI/ICS-Security-Tools/tree/master/pcaps/dnp3)
+
+## Spec
+
+I don't have access to the DNP3 spec, so working off of Wireshark's Parser and odd PDFs I find around the web ([one](https://www.dnp.org/Portals/0/Public%20Documents/DNP3%20AN2013-004b%20Validation%20of%20Incoming%20DNP3%20Data.pdf))

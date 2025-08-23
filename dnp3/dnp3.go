@@ -19,7 +19,7 @@ type DNP3 struct {
 }
 
 // DNP3Type (required by gopacket)
-var DNP3Type = gopacket.RegisterLayerType(20000,
+var LayerTypeDNP3 = gopacket.RegisterLayerType(20000,
 	gopacket.LayerTypeMetadata{
 		Name:    "DNP3",
 		Decoder: gopacket.DecodeFunc(decodeDNP3),
@@ -28,17 +28,27 @@ var DNP3Type = gopacket.RegisterLayerType(20000,
 
 // DNP3Layer type (required by gopacket)
 func (DNP3) LayerType() gopacket.LayerType {
-	return DNP3Type
+	return LayerTypeDNP3
 }
 
 // All DNP3 layer bytes (required by gopacket)
 func (dnp3 DNP3) LayerContents() []byte {
-	return dnp3.ToBytes()
+	b, err := dnp3.ToBytes()
+	if err != nil {
+		fmt.Printf("error encoding DNP3: %v\n", err)
+		return nil
+	}
+	return b
 }
 
 // DNP3 application object bytes (required by gopacket)
 func (dnp3 DNP3) LayerPayload() []byte {
-	return dnp3.Application.ToBytes()
+	b, err := dnp3.Application.ToBytes()
+	if err != nil {
+		fmt.Printf("error encoding DNP3 application: %v\n", err)
+		return nil
+	}
+	return b
 }
 
 // helper to bridge gopacket and FromBytes
@@ -54,7 +64,7 @@ func decodeDNP3(data []byte, p gopacket.PacketBuilder) error {
 
 // FromBytes creates a DNP3 object with appropriate layers based on the
 // bytes slice passed to it. Needs at least 10 bytes.
-func (dnp3 *DNP3) FromBytes(data []byte) error {
+func (d *DNP3) FromBytes(data []byte) error {
 	var (
 		err   error
 		clean []byte
@@ -64,8 +74,8 @@ func (dnp3 *DNP3) FromBytes(data []byte) error {
 			len(data))
 	}
 
-	if err = dnp3.DataLink.FromBytes(data[:10]); err != nil {
-		return fmt.Errorf("can't create DNP3 DataLink layer: %w", err)
+	if err = d.DataLink.FromBytes(data[:10]); err != nil {
+		return fmt.Errorf("error in DNP3 DataLink layer: %w", err)
 	}
 
 	// No transport or application
@@ -73,8 +83,9 @@ func (dnp3 *DNP3) FromBytes(data []byte) error {
 		return nil
 	}
 
-	if clean, err = dnp3.Transport.FromBytes(data[10:]); err != nil {
-		return fmt.Errorf("can't create DNP3 Transport layer: %w", err)
+	// Make transport and remove CRCs
+	if clean, err = d.Transport.FromBytes(data[10:]); err != nil {
+		return fmt.Errorf("error in DNP3 Transport layer: %w", err)
 	}
 
 	// No application?
@@ -82,12 +93,14 @@ func (dnp3 *DNP3) FromBytes(data []byte) error {
 		return nil
 	}
 
-	if dnp3.DataLink.CTL.DIR {
-		dnp3.Application = &ApplicationRequest{}
+	if d.DataLink.CTL.DIR {
+		d.Application = &ApplicationRequest{}
 	} else {
-		dnp3.Application = &ApplicationResponse{}
+		d.Application = &ApplicationResponse{}
 	}
-	dnp3.Application.FromBytes(clean)
+	if err := d.Application.FromBytes(clean); err != nil {
+		return fmt.Errorf("error in DNP3 Application layer: %w", err)
+	}
 
 	return nil
 }
@@ -95,41 +108,31 @@ func (dnp3 *DNP3) FromBytes(data []byte) error {
 // ToBytes assembles the DNP3 packet as bytes, in order. It also performs some
 // updates to ensure the SYN, LEN, and CRCs are set correctly based on the
 // current data
-func (dnp3 *DNP3) ToBytes() []byte {
+func (d *DNP3) ToBytes() ([]byte, error) {
 	var ta []byte
 
 	// get these first, for LEN in DL
-	ta = append(ta, dnp3.Transport.ToByte())
+	ta = append(ta, d.Transport.ToByte())
 	// Application isn't always set
-	if dnp3.Application != nil {
-		ta = append(ta, dnp3.Application.ToBytes()...)
+	if d.Application != nil {
+		b, err := d.Application.ToBytes()
+		if err != nil {
+			return ta, fmt.Errorf("error encoding application data: %v", err)
+		}
+		ta = append(ta, b...)
 	}
 	// len is 5 more bytes in DL, excludes CRCs
-	dnp3.DataLink.LEN = uint16(len(ta) + 5)
+	d.DataLink.LEN = uint16(len(ta) + 5)
 
 	ta = InsertDNP3CRCs(ta)
 
-	return append(dnp3.DataLink.ToBytes(), ta[:]...)
+	return append(d.DataLink.ToBytes(), ta[:]...), nil
 }
 
 // String outputs the DNP3 packet as an indented string
-func (dnp3 *DNP3) String() string {
+func (d *DNP3) String() string {
 	return fmt.Sprintf("DNP3:%s%s%s",
-		dnp3.DataLink.String(),
-		dnp3.Transport.String(),
-		dnp3.Application.String())
-}
-
-// DNP3 Application layer abstraction for different Request / Response
-// structure
-type Application interface {
-	FromBytes([]byte) error
-	ToBytes() []byte
-	String() string
-	GetSequence() uint8
-	SetSequence(uint8) error
-	GetFunctionCode() byte
-	SetFunctionCode(byte)
-	GetData() []byte
-	SetData([]byte) error
+		d.DataLink.String(),
+		d.Transport.String(),
+		d.Application.String())
 }

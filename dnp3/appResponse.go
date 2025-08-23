@@ -18,17 +18,23 @@ func (appresp *ApplicationResponse) FromBytes(d []byte) error {
 	if err := appresp.IIN.FromBytes(d[2], d[3]); err != nil {
 		return fmt.Errorf("can't create application response: %w", err)
 	}
-	appresp.Data.FromBytes(d[4:])
+	if err := appresp.Data.FromBytes(d[4:]); err != nil {
+		return fmt.Errorf("couldn't create AppReq Data FromBytes: %v", err)
+	}
 	return nil
 }
 
-func (appresp *ApplicationResponse) ToBytes() []byte {
+func (appresp *ApplicationResponse) ToBytes() ([]byte, error) {
 	var o []byte
 	o = append(o, appresp.CTL.ToByte())
 	o = append(o, byte(appresp.FC))
 	o = append(o, appresp.IIN.ToBytes()...)
-	o = append(o, appresp.Data.ToBytes()...)
-	return o
+	b, err := appresp.Data.ToBytes()
+	if err != nil {
+		return o, fmt.Errorf("error encoding data: %v", err)
+	}
+	o = append(o, b...)
+	return o, nil
 }
 
 func (appresp *ApplicationResponse) String() string {
@@ -44,6 +50,14 @@ func (appresp *ApplicationResponse) String() string {
 		o += "\n\t\t" + d
 	}
 	return o
+}
+
+func (appresp *ApplicationResponse) GetCTL() ApplicationCTL {
+	return appresp.CTL
+}
+
+func (appresp *ApplicationResponse) SetCTL(ctl ApplicationCTL) {
+	appresp.CTL = ctl
 }
 
 func (appresp *ApplicationResponse) GetSequence() uint8 {
@@ -66,13 +80,12 @@ func (appresp *ApplicationResponse) SetFunctionCode(d byte) {
 	appresp.FC = ResponseFC(d)
 }
 
-func (appresp *ApplicationResponse) GetData() []byte {
-	return appresp.Data.ToBytes()
+func (appresp *ApplicationResponse) GetData() ApplicationData {
+	return appresp.Data
 }
 
-func (appresp *ApplicationResponse) SetData(data []byte) error {
-	err := appresp.Data.FromBytes(data)
-	return err
+func (appresp *ApplicationResponse) SetData(d ApplicationData) {
+	appresp.Data = d
 }
 
 // DNP3 Application ResponseFC specify the action the outstation is taking
@@ -120,9 +133,6 @@ type ApplicationIIN struct {
 }
 
 func (appiin *ApplicationIIN) FromBytes(lsb, msb byte) error {
-	if (msb & 0b11000000) != 0 {
-		return fmt.Errorf("IIN 2.6 and 2.7 must be set to 0")
-	}
 	appiin.AllStations = (lsb & 0b00000001) != 0
 	appiin.Class1Events = (lsb & 0b00000010) != 0
 	appiin.Class2Events = (lsb & 0b00000100) != 0
@@ -139,6 +149,9 @@ func (appiin *ApplicationIIN) FromBytes(lsb, msb byte) error {
 	appiin.BadConfiguration = (msb & 0b00100000) != 0
 	appiin.Reserved1 = (msb & 0b01000000) != 0
 	appiin.Reserved2 = (msb & 0b10000000) != 0
+	if (msb & 0b11000000) != 0 {
+		return fmt.Errorf("IIN 2.6 and 2.7 must be set to 0")
+	}
 	return nil
 }
 
@@ -176,7 +189,7 @@ func (d *ApplicationIIN) ToBytes() []byte {
 		msb |= 0b00000001
 	}
 	if d.ObjectUnknown {
-		msb |= 0b01000010
+		msb |= 0b00000010
 	}
 	if d.ParameterError {
 		msb |= 0b00000100

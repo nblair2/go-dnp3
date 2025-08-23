@@ -1,8 +1,10 @@
 package dnp3
 
 import (
+	"encoding/binary"
 	"fmt"
 	"slices"
+	"time"
 )
 
 var dnp3CRCTable = [256]uint16{
@@ -106,4 +108,33 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 	}
 
 	return crcs, clean, nil
+}
+
+// TODO error checking for both
+func bytesToDNP3TimeAbsolute(b []byte) time.Time {
+	var padded [8]byte
+	copy(padded[:6], b)
+	ms := binary.LittleEndian.Uint64(padded[:])
+	return time.Unix(0, int64(ms)*int64(time.Millisecond))
+}
+
+func dnp3TimeAbsoluteToBytes(t time.Time) []byte {
+	ms := uint64(t.UnixNano() / int64(time.Millisecond))
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, ms)
+	return b[:6]
+}
+
+// TODO make this a time duration
+func bytesTodnp3TimeRelative(b []byte) time.Duration {
+	ms := uint16(b[0]) | uint16(b[1])<<8
+	return time.Duration(ms) * time.Millisecond
+}
+
+func dnp3TimeRelativeToBytes(d time.Duration) []byte {
+	ms := uint16(d / time.Millisecond)
+	b := make([]byte, 2)
+	b[0] = byte(ms & 0xFF)
+	b[1] = byte((ms >> 8) & 0xFF)
+	return b
 }

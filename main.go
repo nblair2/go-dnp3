@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -20,7 +21,7 @@ func main() {
 	defer handle.Close()
 
 	pcap := gopacket.NewPacketSource(handle, handle.LinkType())
-	i := 1
+	i := 0
 	for pkt := range pcap.Packets() {
 
 		i += 1
@@ -31,22 +32,34 @@ func main() {
 			data := tcp.Payload
 			if len(data) >= 10 {
 
+				fmt.Printf("Packet: %d\n", i)
 				var d dnp3.DNP3
 				err := d.FromBytes(data)
 				if err != nil {
-					fmt.Println(err)
+					fmt.Printf("error FromBytes: %v\n", err)
+				}
+
+				b, err := d.ToBytes()
+				if err != nil {
+					fmt.Printf("error ToBytes: %v\n", err)
 					continue
 				}
+				if !slices.Equal(b, data) {
+					fmt.Println("error packet did not match")
 
-				fmt.Printf("Packet: %d\n", i)
-
-				bytes := d.ToBytes()
-				if !slices.Equal(bytes, data) {
-					fmt.Println("Packet did not match")
+					continue
 				}
 				fmt.Printf("Packet raw data:     0x % X\n", data)
-				fmt.Printf("Packet dnp3.ToBytes: 0x % X\n", bytes)
+				fmt.Printf("Packet dnp3.ToBytes: 0x % X\n", b)
+				fmt.Printf("Packet in string format:\n")
 				fmt.Println(d.String())
+				pretty, err := json.MarshalIndent(d, "", "  ")
+				if err != nil {
+					fmt.Printf("error: marshaling DNP3 to JSON: %v\n", err)
+				} else {
+					fmt.Println("Packet in JSON format:")
+					fmt.Println(string(pretty))
+				}
 			}
 		}
 	}

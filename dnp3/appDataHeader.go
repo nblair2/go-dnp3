@@ -1,7 +1,6 @@
 package dnp3
 
 import (
-	"encoding/binary"
 	"fmt"
 )
 
@@ -11,26 +10,24 @@ type ObjectHeader struct {
 	Group     uint8
 	Variation uint8
 	// Qualifier Field
-	Reserved      bool // Should always be set to 0, not enforced
-	ObjPrefixCode ObjPrefixCode
-	RangeSpecCode RangeSpecCode
-
-	RangeField RangeField
-
-	size int
+	Reserved        bool // Should always be set to 0
+	PointPrefixCode PointPrefixCode
+	RangeSpecCode   RangeSpecCode
+	RangeField      RangeField
+	size            int
+	description     string
 }
 
 func (oh *ObjectHeader) FromBytes(d []byte) error {
 	if len(d) < 3 {
 		return fmt.Errorf("object headers are at 3 - 11 bytes, got %d", len(d))
-	} else if d[2]&0b10000000 != 0 {
-		return fmt.Errorf("first qualifier octet bit must be 0 (got %d)", d[2])
 	}
 
 	oh.Group = uint8(d[0])
 	oh.Variation = uint8(d[1])
+	oh.description = getGroupVariationDescription(oh.Group, oh.Variation)
 	oh.Reserved = (d[2] & 0b10000000) != 0
-	oh.ObjPrefixCode = ObjPrefixCode((d[2] & 0b01110000) >> 4)
+	oh.PointPrefixCode = PointPrefixCode((d[2] & 0b01110000) >> 4)
 	oh.RangeSpecCode = RangeSpecCode(d[2] & 0b00001111)
 
 	switch oh.RangeSpecCode {
@@ -82,6 +79,10 @@ func (oh *ObjectHeader) FromBytes(d []byte) error {
 		return fmt.Errorf("range specifier code %d not valid", oh.RangeSpecCode)
 	}
 
+	if oh.Reserved {
+		return fmt.Errorf("first qualifier octet bit must be 0")
+	}
+
 	return nil
 }
 
@@ -94,7 +95,7 @@ func (oh *ObjectHeader) ToBytes() []byte {
 	if oh.Reserved {
 		b |= 0b10000000
 	}
-	b |= uint8((oh.ObjPrefixCode << 4) & 0b01110000)
+	b |= uint8((oh.PointPrefixCode << 4) & 0b01110000)
 	b |= uint8(oh.RangeSpecCode & 0b00001111)
 	o = append(o, b)
 
@@ -104,44 +105,26 @@ func (oh *ObjectHeader) ToBytes() []byte {
 }
 
 func (oh *ObjectHeader) String() string {
-	return fmt.Sprintf(`Object Header:
-				Group:     %02d
-				Variation: %02d
+	o := fmt.Sprintf(`Object Header:
+				Grp, Var :  (%02d, %02d) - %s
 				Qualifier:
-					Obj Prefix Code : (%d) %s
-					Range Spec Code : (%d) %s
-				%s`,
-		oh.Group, oh.Variation, oh.ObjPrefixCode,
-		oh.ObjPrefixCode.String(), oh.RangeSpecCode, oh.RangeSpecCode.String(),
-		oh.RangeField.String())
+					Obj Prefix Code: (%d) %s
+					Range Spec Code: (%d) %s`,
+		oh.Group, oh.Variation, oh.description, oh.PointPrefixCode,
+		oh.PointPrefixCode.String(), oh.RangeSpecCode, oh.RangeSpecCode.String())
+	rf := oh.RangeField.String()
+	if rf != "" {
+		o += "\n\t\t\t\t" + rf
+	}
+	return o
 }
 
 func (oh *ObjectHeader) SizeOf() int {
 	return oh.size
 }
 
-func (oh *ObjectHeader) calcPrefixSize() int {
-	switch oh.ObjPrefixCode {
-	case NoPrefix:
-		return 0
-	case OctetIndex1:
-		return 1
-	case OctetIndex2:
-		return 2
-	case OctetIndex4:
-		return 4
-	case OctetSize1:
-		return 1
-	case OctetSize2:
-		return 2
-	case OctetSize4:
-		return 4
-	}
-	return 0
-}
-
 // ObjectPrefixCode is a 4 bit description of how objects are packed
-type ObjPrefixCode uint8 // only 3 bits
+type PointPrefixCode uint8 // only 3 bits
 
 const (
 	NoPrefix = iota // 0
@@ -154,7 +137,7 @@ const (
 	Reserved // 7
 )
 
-var ObjPrefixCodeNames = map[ObjPrefixCode]string{
+var PointPrefixCodeNames = map[PointPrefixCode]string{
 	NoPrefix:    "NO_PREFIX",
 	OctetIndex1: "1_OCTET_INDEX",
 	OctetIndex2: "2_OCTET_INDEX",
@@ -165,377 +148,292 @@ var ObjPrefixCodeNames = map[ObjPrefixCode]string{
 	Reserved:    "RESERVED",
 }
 
-func (opc ObjPrefixCode) String() string {
-	if name, ok := ObjPrefixCodeNames[opc]; ok {
+var PointPrefixCodeSize = map[PointPrefixCode]int{
+	NoPrefix:    0,
+	OctetIndex1: 1,
+	OctetIndex2: 2,
+	OctetIndex4: 4,
+	OctetSize1:  1,
+	OctetSize2:  2,
+	OctetSize4:  3,
+	Reserved:    0,
+}
+
+func (ppc PointPrefixCode) String() string {
+	if name, ok := PointPrefixCodeNames[ppc]; ok {
 		return name
 	}
-	return fmt.Sprintf("unknown object prefix code %d", opc)
+	return fmt.Sprintf("unknown object prefix code %d", ppc)
 }
 
-// RangeSpec describes how big and how the rangefield is formatted
-type RangeSpecCode uint8 //only 4 bits
-
-const (
-	StartStop1 = iota // 0
-	StartStop2
-	StartStop4
-	VirtualStartStop1
-	VirtualStartStop2
-	VirtualStartStop4
-	NoRangeField
-	Count1
-	Count2
-	Count4
-	ReservedA
-	Count1Variable // B
-	ReservedC
-	ReservedD
-	ReservedE
-	ReservedF
-)
-
-var RangeSpecCodeNames = map[RangeSpecCode]string{
-	StartStop1:        "1_OCTET_START_STOP",
-	StartStop2:        "2_OCTET_START_STOP",
-	StartStop4:        "4_OCTET_START_STOP",
-	VirtualStartStop1: "1_OCTET_VIRTUAL_START_STOP",
-	VirtualStartStop2: "2_OCTET_VIRTUAL_START_STOP",
-	VirtualStartStop4: "4_OCTET_VIRTUAL_START_STOP",
-	NoRangeField:      "NO_RANGE_FIELD",
-	Count1:            "1_OCTET_COUNT",
-	Count2:            "2_OCTET_COUNT",
-	Count4:            "4_OCTET_COUNT",
-	ReservedA:         "RESERVED",
-	Count1Variable:    "COUNT_1_VARIABLE",
-	ReservedC:         "RESERVED",
-	ReservedD:         "RESERVED",
-	ReservedE:         "RESERVED",
-	ReservedF:         "RESERVED",
-}
-
-func (rsc RangeSpecCode) String() string {
-	if name, ok := RangeSpecCodeNames[rsc]; ok {
-		return name
+func (ppc PointPrefixCode) GetPointPrefixSize() int {
+	if size, ok := PointPrefixCodeSize[ppc]; ok {
+		return size
 	}
-	return fmt.Sprintf("unknown object prefix code %d", rsc)
+	return 0
 }
 
-type RangeField interface {
-	ToBytes() []byte
-	FromBytes([]byte) error
-	String() string
-	NumObjects() int
-}
-
-// RangeField0 1 byte start and stop values
-type RangeField0 struct {
-	Start uint8
-	Stop  uint8
-}
-
-func (rf *RangeField0) ToBytes() []byte {
-	return []byte{rf.Start, rf.Stop}
-}
-
-func (rf *RangeField0) FromBytes(d []byte) error {
-	if len(d) != 2 {
-		return fmt.Errorf("requires 2 bytes, got %d", len(d))
+func getGroupVariationDescription(g, v uint8) string {
+	type gv struct{ g, v uint8 }
+	groupVar := gv{g, v}
+	switch groupVar {
+	case gv{1, 0}:
+		return "(Static) Binary Input - Any Variations"
+	case gv{1, 1}:
+		return "(Static) Binary Input - Packed Format"
+	case gv{1, 2}:
+		return "(Static) Binary Input - Status with Flags"
+	case gv{2, 0}:
+		return "(Event) Binary Input Event - Any Variations"
+	case gv{2, 1}:
+		return "(Event) Binary Input Event"
+	case gv{2, 2}:
+		return "(Event) Binary Input Event - with Absolute Time"
+	case gv{2, 3}:
+		return "(Event) Binary Input Event - with Relative Time"
+	case gv{3, 0}:
+		return "(Static) Double-bit Binary Input - Any Variations"
+	case gv{3, 1}:
+		return "(Static) Double-bit Binary Input - Packed Format"
+	case gv{3, 2}:
+		return "(Static) Double-bit Binary Input - Status with Flags"
+	case gv{4, 0}:
+		return "(Event) Double-bit Binary Input Event - Any Variations"
+	case gv{4, 1}:
+		return "(Event) Double-bit Binary Input Event"
+	case gv{4, 2}:
+		return "(Event) Double-bit Binary Input Event with Absolute Time"
+	case gv{4, 3}:
+		return "(Event) Double-bit Binary Input Event with Relative Time"
+	case gv{10, 0}:
+		return "(Static) Binary Output - Any Variations"
+	case gv{10, 1}:
+		return "(Static) Binary Output - Packed Format"
+	case gv{10, 2}:
+		return "(Static) Binary Output - Status with Flags"
+	case gv{11, 0}:
+		return "(Event) Binary Output Event - Any Variations"
+	case gv{11, 1}:
+		return "(Event) Binary Output Event - Status"
+	case gv{11, 2}:
+		return "(Event) Binary Output Event - Status with Time"
+	case gv{12, 0}:
+		return "(Command) Binary Output Command - Any Variations"
+	case gv{12, 1}:
+		return "(Command) Binary Output Command - Control Relay Output Block"
+	case gv{12, 2}:
+		return "(Command) Binary Output Command - Pattern Control Block"
+	case gv{12, 3}:
+		return "(Command) Binary Output Command - Pattern Mask"
+	case gv{13, 0}:
+		return "(Event) Binary Output Command Event - Any Variations"
+	case gv{13, 1}:
+		return "(Event) Binary Output Command Event - Command Status"
+	case gv{13, 2}:
+		return "(Event) Binary Output Command Event - Command Status with Time"
+	case gv{20, 0}:
+		return "(Static) Counter - Any Variations"
+	case gv{20, 1}:
+		return "(Static) Counter - 32-bit with Flag"
+	case gv{20, 2}:
+		return "(Static) Counter - 16-bit with Flag"
+	case gv{20, 5}:
+		return "(Static) Counter - 32-bit w/o Flag"
+	case gv{20, 6}:
+		return "(Static) Counter - 16-bit w/o Flag"
+	case gv{21, 0}:
+		return "(Static) Frozen Counter - Any Variations"
+	case gv{21, 1}:
+		return "(Static) Frozen Counter - 32-bit with Flag"
+	case gv{21, 2}:
+		return "(Static) Frozen Counter - 16-bit with Flag"
+	case gv{21, 5}:
+		return "(Static) Frozen Counter - 32-bit with Flag and Time"
+	case gv{21, 6}:
+		return "(Static) Frozen Counter - 16-bit with Flag and Time"
+	case gv{21, 9}:
+		return "(Static) Frozen Counter - 32-bit w/o Flag"
+	case gv{21, 10}:
+		return "(Static) Frozen Counter - 16-bit w/o Flag"
+	case gv{22, 0}:
+		return "(Event) Counter Event - Any Variations"
+	case gv{22, 1}:
+		return "(Event) Counter Event - 32-bit with Flag"
+	case gv{22, 2}:
+		return "(Event) Counter Event - 16-bit with Flag"
+	case gv{22, 5}:
+		return "(Event) Counter Event - 32-bit with Flag and Time"
+	case gv{22, 6}:
+		return "(Event) Counter Event - 16-bit with Flag and Time"
+	case gv{23, 0}:
+		return "(Event) Frozen Counter Event - Any Variations"
+	case gv{23, 1}:
+		return "(Event) Frozen Counter Event - 32-bit with Flag"
+	case gv{23, 2}:
+		return "(Event) Frozen Counter Event - 16-bit with Flag"
+	case gv{23, 5}:
+		return "(Event) Frozen Counter Event - 32-bit with Flag and Time"
+	case gv{23, 6}:
+		return "(Event) Frozen Counter Event - 16-bit with Flag and Time"
+	case gv{30, 0}:
+		return "(Static) Analog Input - Any Variations"
+	case gv{30, 1}:
+		return "(Static) Analog Input - 32-bit with Flag"
+	case gv{30, 2}:
+		return "(Static) Analog Input - 16-bit with Flag"
+	case gv{30, 3}:
+		return "(Static) Analog Input - 32-bit w/o Flag"
+	case gv{30, 4}:
+		return "(Static) Analog Input - 16-bit w/o Flag"
+	case gv{30, 5}:
+		return "(Static) Analog Input - Single-prec. FP with Flag"
+	case gv{30, 6}:
+		return "(Static) Analog Input - Double-prec. FP with Flag"
+	case gv{31, 0}:
+		return "(Static) Frozen Analog Input - Any Variations"
+	case gv{31, 1}:
+		return "(Static) Frozen Analog Input - 32-bit with Flag"
+	case gv{31, 2}:
+		return "(Static) Frozen Analog Input - 16-bit with Flag"
+	case gv{31, 3}:
+		return "(Static) Frozen Analog Input - 32-bit with Time-of-Freeze"
+	case gv{31, 4}:
+		return "(Static) Frozen Analog Input - 16-bit with Time-of-Freeze"
+	case gv{31, 5}:
+		return "(Static) Frozen Analog Input - 32-bit w/o Flag"
+	case gv{31, 6}:
+		return "(Static) Frozen Analog Input - 16-bit w/o Flag"
+	case gv{31, 7}:
+		return "(Static) Frozen Analog Input - Single-prec. FP with Flag"
+	case gv{31, 8}:
+		return "(Static) Frozen Analog Input - Double-prec. FP with Flag"
+	case gv{32, 0}:
+		return "(Event) Analog Input Event - Any Variations"
+	case gv{32, 1}:
+		return "(Event) Analog Input Event - 32-bit"
+	case gv{32, 2}:
+		return "(Event) Analog Input Event - 16-bit"
+	case gv{32, 3}:
+		return "(Event) Analog Input Event - 32-bit with Time"
+	case gv{32, 4}:
+		return "(Event) Analog Input Event - 16-bit with Time"
+	case gv{32, 5}:
+		return "(Event) Analog Input Event - Single-prec. FP"
+	case gv{32, 6}:
+		return "(Event) Analog Input Event - Double-prec. FP"
+	case gv{32, 7}:
+		return "(Event) Analog Input Event - Single-prec. FP with Time"
+	case gv{32, 8}:
+		return "(Event) Analog Input Event - Double-prec. FP with Time"
+	case gv{33, 0}:
+		return "(Event) Frozen Analog Input Event - Any Variations"
+	case gv{33, 1}:
+		return "(Event) Frozen Analog Input Event - 32-bit"
+	case gv{33, 2}:
+		return "(Event) Frozen Analog Input Event - 16-bit"
+	case gv{33, 3}:
+		return "(Event) Frozen Analog Input Event - 32-bit with Time"
+	case gv{33, 4}:
+		return "(Event) Frozen Analog Input Event - 16-bit with Time"
+	case gv{33, 5}:
+		return "(Event) Frozen Analog Input Event - Single-prec. FP"
+	case gv{33, 6}:
+		return "(Event) Frozen Analog Input Event - Double-prec. FP"
+	case gv{33, 7}:
+		return "(Event) Frozen Analog Input Event - Single-prec. FP with Time"
+	case gv{33, 8}:
+		return "(Event) Frozen Analog Input Event - Double-prec. FP with Time"
+	case gv{34, 0}:
+		return "(Static) Analog Input Deadband - Any Variations"
+	case gv{34, 1}:
+		return "(Static) Analog Input Deadband - 16-bit"
+	case gv{34, 2}:
+		return "(Static) Analog Input Deadband - 32-bit"
+	case gv{34, 3}:
+		return "(Static) Analog Input Deadband - Single-prec. FP"
+	case gv{40, 0}:
+		return "(Static) Analog Output Status - Any Variations"
+	case gv{40, 1}:
+		return "(Static) Analog Output Status - 32-bit with Flag"
+	case gv{40, 2}:
+		return "(Static) Analog Output Status - 16-bit with Flag"
+	case gv{40, 3}:
+		return "(Static) Analog Output Status - Single-prec. FP with Flag"
+	case gv{40, 4}:
+		return "(Static) Analog Output Status - Double-prec. FP with Flag"
+	case gv{41, 0}:
+		return "(Command) Analog Output Command - Any Variations"
+	case gv{41, 1}:
+		return "(Command) Analog Output Command - 32-bit"
+	case gv{41, 2}:
+		return "(Command) Analog Output Command - 16-bit"
+	case gv{41, 3}:
+		return "(Command) Analog Output Command - Single-prec. FP"
+	case gv{41, 4}:
+		return "(Command) Analog Output Command - Double-prec. FP"
+	case gv{42, 0}:
+		return "(Event) Analog Output Event - Any Variations"
+	case gv{42, 1}:
+		return "(Event) Analog Output Event - 32-bit"
+	case gv{42, 2}:
+		return "(Event) Analog Output Event - 16-bit"
+	case gv{42, 3}:
+		return "(Event) Analog Output Event - 32-bit with Time"
+	case gv{42, 4}:
+		return "(Event) Analog Output Event - 16-bit with Time"
+	case gv{42, 5}:
+		return "(Event) Analog Output Event - Single-prec. FP"
+	case gv{42, 6}:
+		return "(Event) Analog Output Event - Double-prec. FP"
+	case gv{42, 7}:
+		return "(Event) Analog Output Event - Single-prec. FP with Time"
+	case gv{42, 8}:
+		return "(Event) Analog Output Event - Double-prec. FP with Time"
+	case gv{43, 0}:
+		return "(Event) Analog Output Command Event - Any Variations"
+	case gv{43, 1}:
+		return "(Event) Analog Output Command Event - 32-bit"
+	case gv{43, 2}:
+		return "(Event) Analog Output Command Event - 16-bit"
+	case gv{43, 3}:
+		return "(Event) Analog Output Command Event - 32-bit with Time"
+	case gv{43, 4}:
+		return "(Event) Analog Output Command Event - 16-bit with Time"
+	case gv{43, 5}:
+		return "(Event) Analog Output Command Event - Single-prec. FP"
+	case gv{43, 6}:
+		return "(Event) Analog Output Command Event - Double-prec. FP"
+	case gv{43, 7}:
+		return "(Event) Analog Output Command Event - Single-prec. FP with Time"
+	case gv{43, 8}:
+		return "(Event) Analog Output Command Event - Double-prec. FP with Time"
+	case gv{50, 1}:
+		return "(Info) Time and Date - Absolute Time"
+	case gv{50, 2}:
+		return "(Info) Time and Date - Absolute Time and Interval"
+	case gv{50, 3}:
+		return "(Info) Time and Date - Absolute Time at Last Recorded Time"
+	case gv{50, 4}:
+		return "(Info) Time and Date - Indexed Absolute Time and Long Interval"
+	case gv{51, 1}:
+		return "(Info) Time and Date CTO - Absolute Time, Synchronized"
+	case gv{51, 2}:
+		return "(Info) Time and Date CTO - Absolute Time, Unsynchronized"
+	case gv{52, 1}:
+		return "(Info) Time Delay Coarse"
+	case gv{52, 2}:
+		return "(Info) Time Delay Fine"
+	case gv{60, 1}:
+		return "(Info) Class Objects - Class 0 Data"
+	case gv{60, 2}:
+		return "(Info) Class Objects - Class 1 Data"
+	case gv{60, 3}:
+		return "(Info) Class Objects - Class 2 Data"
+	case gv{60, 4}:
+		return "(Info) Class Objects - Class 3 Data"
+	case gv{80, 1}:
+		return "(Static) Internal Indications - Packed Format"
+	default:
+		return "Unknown Group/Variation"
 	}
-	rf.Start = d[0]
-	rf.Stop = d[1]
-	return nil
-}
-
-func (rf *RangeField0) String() string {
-	return fmt.Sprintf(`Range Field (0) 1-octet start and stop indexes:
-					Start: %d
-					Stop : %d`, rf.Start, rf.Stop)
-}
-
-func (rf *RangeField0) NumObjects() int {
-	return int(rf.Stop - rf.Start + 1)
-}
-
-// RangeField1 2 byte start and stop values
-type RangeField1 struct {
-	Start uint16
-	Stop  uint16
-}
-
-func (rf *RangeField1) ToBytes() []byte {
-	var o []byte
-	o = binary.LittleEndian.AppendUint16(o, rf.Start)
-	o = binary.LittleEndian.AppendUint16(o, rf.Stop)
-	return o
-}
-
-func (rf *RangeField1) FromBytes(d []byte) error {
-	if len(d) != 4 {
-		return fmt.Errorf("requires 4 bytes, got %d", len(d))
-	}
-	rf.Start = binary.LittleEndian.Uint16(d[0:2])
-	rf.Stop = binary.LittleEndian.Uint16(d[2:4])
-	return nil
-}
-
-func (rf *RangeField1) String() string {
-	return fmt.Sprintf(`Range Field (1) 2-octet start and stop indexes:
-					Start: %d
-					Stop : %d`, rf.Start, rf.Stop)
-}
-
-func (rf *RangeField1) NumObjects() int {
-	return int(rf.Stop - rf.Start + 1)
-}
-
-// RangeField2 4 byte start and stop values
-type RangeField2 struct {
-	Start uint32
-	Stop  uint32
-}
-
-func (rf *RangeField2) ToBytes() []byte {
-	var o []byte
-	o = binary.LittleEndian.AppendUint32(o, rf.Start)
-	o = binary.LittleEndian.AppendUint32(o, rf.Stop)
-	return o
-}
-
-func (rf *RangeField2) FromBytes(d []byte) error {
-	if len(d) != 8 {
-		return fmt.Errorf("requires 8 bytes, got %d", len(d))
-	}
-	rf.Start = binary.LittleEndian.Uint32(d[0:4])
-	rf.Stop = binary.LittleEndian.Uint32(d[4:8])
-	return nil
-}
-
-func (rf *RangeField2) String() string {
-	return fmt.Sprintf(`Range Field (2) 4-octet start and stop indexes:
-					Start: %d
-					Stop : %d`, rf.Start, rf.Stop)
-}
-
-func (rf *RangeField2) NumObjects() int {
-	return int(rf.Stop - rf.Start + 1)
-}
-
-// RangeField3 1 byte VIRTUAL start and stop values
-type RangeField3 struct {
-	Start uint8
-	Stop  uint8
-}
-
-func (rf *RangeField3) ToBytes() []byte {
-	return []byte{rf.Start, rf.Stop}
-}
-
-func (rf *RangeField3) FromBytes(d []byte) error {
-	if len(d) != 2 {
-		return fmt.Errorf("requires 2 bytes, got %d", len(d))
-	}
-	rf.Start = d[0]
-	rf.Stop = d[1]
-	return nil
-}
-
-func (rf *RangeField3) String() string {
-	return fmt.Sprintf(`Range Field (3) 1-octet virtual start and stop indexes:
-					Start: %d (virtual)
-					Stop : %d (virtual)`, rf.Start, rf.Stop)
-}
-
-func (rf *RangeField3) NumObjects() int {
-	return int(rf.Stop - rf.Start + 1)
-}
-
-// RangeField4 2 byte VIRTUAL start and stop values
-type RangeField4 struct {
-	Start uint16
-	Stop  uint16
-}
-
-func (rf *RangeField4) ToBytes() []byte {
-	var o []byte
-	o = binary.LittleEndian.AppendUint16(o, rf.Start)
-	o = binary.LittleEndian.AppendUint16(o, rf.Stop)
-	return o
-}
-
-func (rf *RangeField4) FromBytes(d []byte) error {
-	if len(d) != 4 {
-		return fmt.Errorf("requires 4 bytes, got %d", len(d))
-	}
-	rf.Start = binary.LittleEndian.Uint16(d[0:2])
-	rf.Stop = binary.LittleEndian.Uint16(d[2:4])
-	return nil
-}
-
-func (rf *RangeField4) String() string {
-	return fmt.Sprintf(`Range Field (4) 2-octet virtual start and stop indexes:
-					Start: %d (virtual)
-					Stop : %d (virtual)`, rf.Start, rf.Stop)
-}
-
-func (rf *RangeField4) NumObjects() int {
-	return int(rf.Stop - rf.Start + 1)
-}
-
-// RangeField5 4 byte VIRTUAL start and stop values
-type RangeField5 struct {
-	Start uint32
-	Stop  uint32
-}
-
-func (rf *RangeField5) ToBytes() []byte {
-	var o []byte
-	o = binary.LittleEndian.AppendUint32(o, rf.Start)
-	o = binary.LittleEndian.AppendUint32(o, rf.Stop)
-	return o
-}
-
-func (rf *RangeField5) FromBytes(d []byte) error {
-	if len(d) != 8 {
-		return fmt.Errorf("requires 8 bytes, got %d", len(d))
-	}
-	rf.Start = binary.LittleEndian.Uint32(d[0:4])
-	rf.Stop = binary.LittleEndian.Uint32(d[4:8])
-	return nil
-}
-
-func (rf *RangeField5) String() string {
-	return fmt.Sprintf(`Range Field (5) 4-octet virtual start and stop indexes:
-					Start: %d (virtual)
-					Stop : %d (virtual)`, rf.Start, rf.Stop)
-}
-
-func (rf *RangeField5) NumObjects() int {
-	return int(rf.Stop - rf.Start + 1)
-}
-
-// RangeField6 - No range field used, Implies all values
-type RangeField6 struct{}
-
-func (rf *RangeField6) ToBytes() []byte {
-	return nil
-}
-
-func (rf *RangeField6) FromBytes(d []byte) error {
-	if len(d) > 0 {
-		return fmt.Errorf("range field 6 is an empty range field")
-	}
-	return nil
-}
-
-func (rf *RangeField6) String() string { return "" }
-
-func (rf *RangeField6) NumObjects() int { return 0 }
-
-// RangeField7 1 byte count of objects
-type RangeField7 struct {
-	Count uint8
-}
-
-func (rf *RangeField7) ToBytes() []byte {
-	return []byte{rf.Count}
-}
-
-func (rf *RangeField7) FromBytes(d []byte) error {
-	if len(d) != 1 {
-		return fmt.Errorf("requires 1 byte, got %d", len(d))
-	}
-	rf.Count = d[0]
-	return nil
-}
-
-func (rf *RangeField7) String() string {
-	return fmt.Sprintf(`Range Field (7) 1-octet count of objects:
-					Count: %d`, rf.Count)
-}
-
-func (rf *RangeField7) NumObjects() int {
-	return int(rf.Count)
-}
-
-// RangeField8 2 byte count of objects
-type RangeField8 struct {
-	Count uint16
-}
-
-func (rf *RangeField8) ToBytes() []byte {
-	var o []byte
-	o = binary.LittleEndian.AppendUint16(o, rf.Count)
-	return o
-}
-
-func (rf *RangeField8) FromBytes(d []byte) error {
-	if len(d) != 2 {
-		return fmt.Errorf("requires 2 byte, got %d", len(d))
-	}
-	rf.Count = binary.LittleEndian.Uint16(d)
-	return nil
-}
-
-func (rf *RangeField8) String() string {
-	return fmt.Sprintf(`Range Field (8) 2-octet count of objects:
-					Count: %d`, rf.Count)
-}
-
-func (rf *RangeField8) NumObjects() int {
-	return int(rf.Count)
-}
-
-// RangeField9 4 byte count of objects
-type RangeField9 struct {
-	Count uint32
-}
-
-func (rf *RangeField9) ToBytes() []byte {
-	var o []byte
-	o = binary.LittleEndian.AppendUint32(o, rf.Count)
-	return o
-}
-
-func (rf *RangeField9) FromBytes(d []byte) error {
-	if len(d) != 4 {
-		return fmt.Errorf("requires 4 byte, got %d", len(d))
-	}
-	rf.Count = binary.LittleEndian.Uint32(d[0:4])
-	return nil
-}
-
-func (rf *RangeField9) String() string {
-	return fmt.Sprintf(`Range Field (9) 4-octet count of objects:
-					Count: %d`, rf.Count)
-}
-
-func (rf *RangeField9) NumObjects() int {
-	return int(rf.Count)
-}
-
-// RangeFieldB 1 byte count of objects with variable format
-type RangeFieldB struct {
-	Count uint8
-	// Variable ?
-}
-
-func (rf *RangeFieldB) ToBytes() []byte {
-	return []byte{rf.Count}
-}
-
-func (rf *RangeFieldB) FromBytes(d []byte) error {
-	if len(d) != 1 {
-		return fmt.Errorf("requires 1 byte, got %d", len(d))
-	}
-	rf.Count = d[0]
-	return nil
-}
-
-func (rf *RangeFieldB) String() string {
-	return fmt.Sprintf(`Range Field (B) 1-octet count of objects with variable format:
-					Count: %d`, rf.Count)
-}
-
-func (rf *RangeFieldB) NumObjects() int {
-	return int(rf.Count)
 }

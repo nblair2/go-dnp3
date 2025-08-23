@@ -66,9 +66,8 @@ func (d DataLink) String() string {
 		LEN: %d
 		%s
 		DST: %d
-		SRC: %d
-		CRC: 0x % X`,
-		d.SYN, d.LEN, d.CTL.String(), d.DST, d.SRC, d.CRC)
+		SRC: %d`,
+		d.SYN, d.LEN, d.CTL.String(), d.DST, d.SRC)
 }
 
 // DataLinkControl is the 4th byte of the data link header.

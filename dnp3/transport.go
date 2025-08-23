@@ -1,6 +1,8 @@
 package dnp3
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // DNP3Transport is the second layer of DNP3, and allows for fragmentation
 // and subsequent reassembly of application data. In addition to trans header,
@@ -41,12 +43,11 @@ func (trans *Transport) ToByte() byte {
 	return o
 }
 
-func (trans Transport) String() string {
+func (trans *Transport) String() string {
 	return fmt.Sprintf(`
 	Transport:
 		FIN: %t
 		FIR: %t
-		SEQ: %d
-		CRC: 0x % X`,
-		trans.FIN, trans.FIR, trans.SEQ, trans.CRC)
+		SEQ: %d`,
+		trans.FIN, trans.FIR, trans.SEQ)
 }
