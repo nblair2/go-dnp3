@@ -1,10 +1,15 @@
 # go-dnp3
 
+[![GoDoc](https://godoc.org/github.com/nblair2/go-dnp3?status.svg)](https://godoc.org/github.com/nblair2/go-dnp3)
+![Go Version](https://img.shields.io/github/go-mod/go-version/nblair2/go-dnp3?filename=go.mod&style=flat-square)
+![License](https://img.shields.io/github/license/nblair2/go-dnp3?style=flat-square)
+
+
 DNP3 parsing in go.
 * **`FromBytes([]byte)`** to parse a byte slice and interpret it as DNP3
 * **`ToBytes()`** to go from a struct back to bytes (calculates length, calculates and inserts CRCs on the way)
 * **`String()`** to get packet as human-readable indented string (Reserved and CRCs not shown)
-* **`json.MarshalIndent(dnp, "", "  ")`** to get packet as machine-friendly 
+* **`json.Marshal(DNP3)`** to get packet as machine-friendly 
 
 ## Improvements
 
@@ -18,7 +23,7 @@ DNP3 parsing in go.
 
 ## Test
 
-Run `make test` to check `examples/*.pcap` for errors. Data taken from [opendnp3 conformance reports](https://dnp3.github.io/conformance/report.html) and [ITI ICS Security Tools Repository](https://github.com/ITI/ICS-Security-Tools/tree/master/pcaps/dnp3)
+Run `go test -v` to check a few different DNP3 messages. You can also use the `-args -pcaps=examples/opendnp3_test1.pcap` argument to pass in a full PCAP. Data taken from [opendnp3 conformance reports](https://dnp3.github.io/conformance/report.html).
 
 ## Spec
 

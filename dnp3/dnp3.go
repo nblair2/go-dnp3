@@ -1,4 +1,8 @@
-// partial implementation of DNP3 for gopacket
+// DNP3 (Distributed Network Protocol version 3) is a SCADA protocol used in
+// industrial automation, especially electric power and water services in
+// North America. See dnp.org, IEEE-1815.
+// The protocol consists of three layers: A data link layer, a transport layer,
+// and an application layer.
 package dnp3
 
 import (
@@ -7,11 +11,6 @@ import (
 	"github.com/google/gopacket"
 )
 
-// DNP3 (Distributed Network Protocol version 3) is a SCADA protocol used in
-// industrial automation, especially electric power and water services in
-// North America. See dnp.org, IEEE-1815.
-// The protocol consists of three layers: A data link layer, a transport layer,
-// and an application layer.
 type DNP3 struct {
 	DataLink    DataLink
 	Transport   Transport
