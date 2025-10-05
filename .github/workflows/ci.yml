@@ -1,8 +1,15 @@
 name: CI
 
 on:
+  push:
+    branches: [ "main" ]
   pull_request:
     branches: [ "**" ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ci.yml'
 
 jobs:
   golangci-lint:
@@ -13,6 +20,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: 1.24.4
+      - name: Install libpcap-dev
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.5.0
