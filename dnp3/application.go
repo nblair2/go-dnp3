@@ -5,23 +5,23 @@ import (
 )
 
 // DNP3 Application layer abstraction for different Request / Response
-// structure
+// structure.
 type Application interface {
-	FromBytes([]byte) error
+	FromBytes(data []byte) error
 	ToBytes() ([]byte, error)
 	String() string
 	GetCTL() ApplicationCTL
-	SetCTL(ApplicationCTL)
+	SetCTL(ctl ApplicationCTL)
 	GetSequence() uint8
-	SetSequence(uint8) error
+	SetSequence(seq uint8) error
 	GetFunctionCode() byte
-	SetFunctionCode(byte)
+	SetFunctionCode(fc byte)
 	GetData() ApplicationData
-	SetData(ApplicationData)
+	SetData(data ApplicationData)
 }
 
 // ApplicationCTL
-// a common header byte for both application types
+// a common header byte for both application types.
 type ApplicationCTL struct {
 	FIR bool
 	FIN bool
@@ -39,17 +39,20 @@ func (appctl *ApplicationCTL) FromByte(d byte) {
 }
 
 func (appctl *ApplicationCTL) ToByte() byte {
-	var o byte = 0
+	var o byte
 
 	if appctl.FIR {
 		o |= 0b10000000
 	}
+
 	if appctl.FIN {
 		o |= 0b01000000
 	}
+
 	if appctl.CON {
 		o |= 0b00100000
 	}
+
 	if appctl.UNS {
 		o |= 0b00010000
 	}

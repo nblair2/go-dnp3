@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// ApplicationData holds an array of Data objects
+// ApplicationData holds an array of Data objects.
 type ApplicationData struct {
 	OBJS []DataObject
 	// in case we get in to trouble unrolling the objects just store the rest
@@ -14,13 +14,18 @@ type ApplicationData struct {
 
 func (ad *ApplicationData) FromBytes(d []byte) error {
 	ad.OBJS = nil // in case there was already stuff here
+
 	for i := 0; i < len(d); {
 		var obj DataObject
-		if err := obj.FromBytes(d[i:]); err != nil {
+
+		err := obj.FromBytes(d[i:])
+		if err != nil {
 			ad.extra = d[i:]
-			return fmt.Errorf("could not decode object: 0x % X, err: %v",
+
+			return fmt.Errorf("could not decode object: 0x % X, err: %w",
 				d[i:], err)
 		}
+
 		ad.OBJS = append(ad.OBJS, obj)
 		i += obj.SizeOf()
 	}
@@ -30,35 +35,43 @@ func (ad *ApplicationData) FromBytes(d []byte) error {
 
 func (ad *ApplicationData) ToBytes() ([]byte, error) {
 	var o []byte
+
 	for _, do := range ad.OBJS {
 		b, err := do.ToBytes()
 		if err != nil {
-			return o, fmt.Errorf("could not encode object: %v", err)
+			return o, fmt.Errorf("could not encode object: %w", err)
 		}
+
 		o = append(o, b...)
 	}
+
 	o = append(o, ad.extra...)
+
 	return o, nil
 }
 
 func (ad *ApplicationData) String() string {
 	o := ""
 	header := "Data Objects:"
-	header_added := false
+	headerAdded := false
+
 	if len(ad.OBJS) > 0 {
 		o += header
-		header_added = true
+		headerAdded = true
+
 		for _, obj := range ad.OBJS {
 			o += "\n\t\t      - " + obj.String()
 		}
 	}
 
 	if len(ad.extra) > 0 {
-		if !header_added {
+		if !headerAdded {
 			o += header
 		}
+
 		o += fmt.Sprintf("\n\t\t      - Extra: 0x % X", ad.extra)
 	}
+
 	return o
 }
 
@@ -72,18 +85,21 @@ type DataObject struct {
 }
 
 func (do *DataObject) FromBytes(d []byte) error {
-	var err error
-	if err = do.Header.FromBytes(d); err != nil {
+	err := do.Header.FromBytes(d)
+	if err != nil {
 		return fmt.Errorf("can't create Data Object Header: %w", err)
 	}
+
 	headSize := do.Header.SizeOf()
 	do.totalSize = headSize
 
 	do.constructor = do.getPointsConstructor()
+
 	do.packer = do.getPointsPacker()
 	if do.constructor == nil {
 		do.Extra = d[headSize:]
 		do.totalSize += len(do.Extra)
+
 		return fmt.Errorf("unsupported group/variation: %d/%d",
 			do.Header.Group, do.Header.Variation)
 	}
@@ -92,14 +108,21 @@ func (do *DataObject) FromBytes(d []byte) error {
 	if numPoints == 0 {
 		return nil
 	}
+
 	var sizeAllPoints int
-	do.Points, sizeAllPoints, err = do.constructor(d[headSize:], numPoints, do.Header.PointPrefixCode.GetPointPrefixSize())
+
+	do.Points, sizeAllPoints, err = do.constructor(
+		d[headSize:],
+		numPoints,
+		do.Header.PointPrefixCode.GetPointPrefixSize(),
+	)
 	do.totalSize += sizeAllPoints
+
 	return err
 }
 
-// TODO get this to be more elegant
 func (do *DataObject) ToBytes() ([]byte, error) {
+	// TODO get this to be more elegant.
 	var o []byte
 
 	o = append(o, do.Header.ToBytes()...)
@@ -112,18 +135,23 @@ func (do *DataObject) ToBytes() ([]byte, error) {
 
 		if do.packer == nil {
 			o = append(o, do.Extra...)
+
 			return o, fmt.Errorf("no packer for Group %d, Var %d",
 				do.Header.Group, do.Header.Variation)
 		}
+
 		b, err := do.packer(do.Points)
 		if err != nil {
 			o = append(o, do.Extra...)
-			return o, fmt.Errorf("could not pack points: %v", err)
+
+			return o, fmt.Errorf("could not pack points: %w", err)
 		}
+
 		o = append(o, b...)
 	}
 
 	o = append(o, do.Extra...)
+
 	return o, nil
 }
 
@@ -138,6 +166,7 @@ func (do *DataObject) String() string {
 	for _, p := range do.Points {
 		o += p.String()
 	}
+
 	return o
 }
 
@@ -147,6 +176,7 @@ func (do *DataObject) SizeOf() int {
 
 func (do *DataObject) getPointsConstructor() PointsConstructor {
 	type gv struct{ g, v int }
+
 	groupVar := gv{int(do.Header.Group), int(do.Header.Variation)}
 	switch groupVar {
 	// Binary Input
@@ -424,11 +454,13 @@ func (do *DataObject) getPointsConstructor() PointsConstructor {
 	case gv{80, 1}: // Internal Indications - Packed Format (1 octet)
 		return newPoints1Byte
 	}
+
 	return nil
 }
 
 func (do *DataObject) getPointsPacker() PointsPacker {
 	type gv struct{ g, v int }
+
 	groupVar := gv{int(do.Header.Group), int(do.Header.Variation)}
 	switch groupVar {
 	// No points
@@ -453,7 +485,7 @@ func (do *DataObject) getPointsPacker() PointsPacker {
 		gv{40, 1}, gv{40, 3}, gv{41, 1}, gv{41, 3}, gv{42, 1}, gv{42, 5},
 		gv{43, 1}, gv{43, 5},
 		gv{50, 1}, gv{50, 3}, gv{51, 1}, gv{51, 2},
-		gv{4, 2}, gv{11, 2}, gv{13, 2}, gv{51, 2},
+		gv{4, 2}, gv{11, 2}, gv{13, 2},
 		gv{21, 6}, gv{22, 6}, gv{23, 6}, gv{30, 6}, gv{31, 4}, gv{31, 8},
 		gv{32, 9}, gv{32, 6}, gv{33, 4}, gv{33, 6}, gv{40, 4}, gv{41, 4},
 		gv{42, 4}, gv{42, 6}, gv{43, 4}, gv{43, 6},
@@ -464,5 +496,6 @@ func (do *DataObject) getPointsPacker() PointsPacker {
 		gv{32, 8}, gv{33, 8}, gv{42, 8}, gv{43, 8}:
 		return packPointsBytes
 	}
+
 	return nil
 }

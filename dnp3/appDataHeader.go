@@ -1,10 +1,11 @@
 package dnp3
 
 import (
+	"errors"
 	"fmt"
 )
 
-// ObjectHeaders are used to describe the structure of application data
+// ObjectHeader is used to describe the structure of application data.
 type ObjectHeader struct {
 	// Object Type Field
 	Group     uint8
@@ -18,69 +19,129 @@ type ObjectHeader struct {
 	description     string
 }
 
+func newRangeFieldFromSpec(code RangeSpecCode, d []byte) (RangeField, int, error) {
+	switch code {
+	case StartStop1:
+		rf := &RangeField0{}
+
+		err := rf.FromBytes(d[3:5])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 5, nil
+	case StartStop2:
+		rf := &RangeField1{}
+
+		err := rf.FromBytes(d[3:7])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 7, nil
+	case StartStop4:
+		rf := &RangeField2{}
+
+		err := rf.FromBytes(d[3:11])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 11, nil
+	case VirtualStartStop1:
+		rf := &RangeField3{}
+
+		err := rf.FromBytes(d[3:5])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 5, nil
+	case VirtualStartStop2:
+		rf := &RangeField4{}
+
+		err := rf.FromBytes(d[3:7])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 7, nil
+	case VirtualStartStop4:
+		rf := &RangeField5{}
+
+		err := rf.FromBytes(d[3:11])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 11, nil
+	case NoRangeField:
+		return &RangeField6{}, 3, nil
+	case Count1:
+		rf := &RangeField7{}
+
+		err := rf.FromBytes([]byte{d[3]})
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 4, nil
+	case Count2:
+		rf := &RangeField8{}
+
+		err := rf.FromBytes(d[3:5])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 5, nil
+	case Count4:
+		rf := &RangeField9{}
+
+		err := rf.FromBytes(d[3:7])
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 7, nil
+	case Count1Variable:
+		rf := &RangeFieldB{}
+
+		err := rf.FromBytes([]byte{d[3]})
+		if err != nil {
+			return nil, 0, fmt.Errorf("can't create range field: %w", err)
+		}
+
+		return rf, 4, nil
+	case ReservedA, ReservedC, ReservedD, ReservedE, ReservedF:
+		return nil, 3, fmt.Errorf("range specifier code %d not valid", code)
+	default:
+		return nil, 0, fmt.Errorf("unknown range specifier code %d", code)
+	}
+}
+
 func (oh *ObjectHeader) FromBytes(d []byte) error {
 	if len(d) < 3 {
 		return fmt.Errorf("object headers are at 3 - 11 bytes, got %d", len(d))
 	}
 
-	oh.Group = uint8(d[0])
-	oh.Variation = uint8(d[1])
+	oh.Group = d[0]
+	oh.Variation = d[1]
 	oh.description = getGroupVariationDescription(oh.Group, oh.Variation)
 	oh.Reserved = (d[2] & 0b10000000) != 0
 	oh.PointPrefixCode = PointPrefixCode((d[2] & 0b01110000) >> 4)
 	oh.RangeSpecCode = RangeSpecCode(d[2] & 0b00001111)
 
-	switch oh.RangeSpecCode {
-	case StartStop1:
-		oh.RangeField = &RangeField0{}
-		oh.RangeField.FromBytes(d[3:5])
-		oh.size = 5
-	case StartStop2:
-		oh.RangeField = &RangeField1{}
-		oh.RangeField.FromBytes(d[3:7])
-		oh.size = 7
-	case StartStop4:
-		oh.RangeField = &RangeField2{}
-		oh.RangeField.FromBytes(d[3:11])
-		oh.size = 11
-	case VirtualStartStop1:
-		oh.RangeField = &RangeField3{}
-		oh.RangeField.FromBytes(d[3:5])
-		oh.size = 5
-	case VirtualStartStop2:
-		oh.RangeField = &RangeField4{}
-		oh.RangeField.FromBytes(d[3:7])
-		oh.size = 7
-	case VirtualStartStop4:
-		oh.RangeField = &RangeField5{}
-		oh.RangeField.FromBytes(d[3:11])
-		oh.size = 11
-	case NoRangeField:
-		oh.RangeField = &RangeField6{}
-		oh.size = 3
-	case Count1:
-		oh.RangeField = &RangeField7{}
-		oh.RangeField.FromBytes([]byte{d[3]})
-		oh.size = 4
-	case Count2:
-		oh.RangeField = &RangeField8{}
-		oh.RangeField.FromBytes(d[3:5])
-		oh.size = 5
-	case Count4:
-		oh.RangeField = &RangeField9{}
-		oh.RangeField.FromBytes(d[3:7])
-		oh.size = 7
-	case Count1Variable:
-		oh.RangeField = &RangeFieldB{}
-		oh.RangeField.FromBytes([]byte{d[3]})
-		oh.size = 4
-	case ReservedA, ReservedC, ReservedD, ReservedE, ReservedF:
-		oh.size = 3
-		return fmt.Errorf("range specifier code %d not valid", oh.RangeSpecCode)
+	rf, size, err := newRangeFieldFromSpec(oh.RangeSpecCode, d)
+	oh.RangeField = rf
+	oh.size = size
+
+	if err != nil {
+		return err
 	}
 
 	if oh.Reserved {
-		return fmt.Errorf("first qualifier octet bit must be 0")
+		return errors.New("first qualifier octet bit must be 0")
 	}
 
 	return nil
@@ -88,13 +149,15 @@ func (oh *ObjectHeader) FromBytes(d []byte) error {
 
 func (oh *ObjectHeader) ToBytes() []byte {
 	var o []byte
+
 	o = append(o, oh.Group)
 	o = append(o, oh.Variation)
 
-	var b byte = 0
+	var b byte
 	if oh.Reserved {
 		b |= 0b10000000
 	}
+
 	b |= uint8((oh.PointPrefixCode << 4) & 0b01110000)
 	b |= uint8(oh.RangeSpecCode & 0b00001111)
 	o = append(o, b)
@@ -112,10 +175,12 @@ func (oh *ObjectHeader) String() string {
 					Range Spec Code: (%d) %s`,
 		oh.Group, oh.Variation, oh.description, oh.PointPrefixCode,
 		oh.PointPrefixCode.String(), oh.RangeSpecCode, oh.RangeSpecCode.String())
+
 	rf := oh.RangeField.String()
 	if rf != "" {
 		o += "\n\t\t\t\t" + rf
 	}
+
 	return o
 }
 
@@ -123,7 +188,7 @@ func (oh *ObjectHeader) SizeOf() int {
 	return oh.size
 }
 
-// ObjectPrefixCode is a 4 bit description of how objects are packed
+// PointPrefixCode is a 4 bit description of how objects are packed.
 type PointPrefixCode uint8 // only 3 bits
 
 const (
@@ -163,6 +228,7 @@ func (ppc PointPrefixCode) String() string {
 	if name, ok := PointPrefixCodeNames[ppc]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("unknown object prefix code %d", ppc)
 }
 
@@ -170,11 +236,13 @@ func (ppc PointPrefixCode) GetPointPrefixSize() int {
 	if size, ok := PointPrefixCodeSize[ppc]; ok {
 		return size
 	}
+
 	return 0
 }
 
 func getGroupVariationDescription(g, v uint8) string {
 	type gv struct{ g, v uint8 }
+
 	groupVar := gv{g, v}
 	switch groupVar {
 	case gv{1, 0}:

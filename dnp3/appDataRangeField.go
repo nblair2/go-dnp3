@@ -2,11 +2,12 @@ package dnp3
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
-// RangeSpec describes how big and how the rangefield is formatted
-type RangeSpecCode uint8 //only 4 bits
+// RangeSpec describes how big and how the rangefield is formatted.
+type RangeSpecCode uint8 // only 4 bits
 
 const (
 	StartStop1 = iota // 0
@@ -50,17 +51,18 @@ func (rsc RangeSpecCode) String() string {
 	if name, ok := RangeSpecCodeNames[rsc]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("unknown object prefix code %d", rsc)
 }
 
 type RangeField interface {
 	ToBytes() []byte
-	FromBytes([]byte) error
+	FromBytes(data []byte) error
 	String() string
 	NumObjects() int
 }
 
-// RangeField0 1 byte start and stop values
+// RangeField0 1 byte start and stop values.
 type RangeField0 struct {
 	Start uint8
 	Stop  uint8
@@ -74,8 +76,10 @@ func (rf *RangeField0) FromBytes(d []byte) error {
 	if len(d) != 2 {
 		return fmt.Errorf("requires 2 bytes, got %d", len(d))
 	}
+
 	rf.Start = d[0]
 	rf.Stop = d[1]
+
 	return nil
 }
 
@@ -89,7 +93,7 @@ func (rf *RangeField0) NumObjects() int {
 	return int(rf.Stop - rf.Start + 1)
 }
 
-// RangeField1 2 byte start and stop values
+// RangeField1 2 byte start and stop values.
 type RangeField1 struct {
 	Start uint16
 	Stop  uint16
@@ -97,8 +101,10 @@ type RangeField1 struct {
 
 func (rf *RangeField1) ToBytes() []byte {
 	var o []byte
+
 	o = binary.LittleEndian.AppendUint16(o, rf.Start)
 	o = binary.LittleEndian.AppendUint16(o, rf.Stop)
+
 	return o
 }
 
@@ -106,8 +112,10 @@ func (rf *RangeField1) FromBytes(d []byte) error {
 	if len(d) != 4 {
 		return fmt.Errorf("requires 4 bytes, got %d", len(d))
 	}
+
 	rf.Start = binary.LittleEndian.Uint16(d[0:2])
 	rf.Stop = binary.LittleEndian.Uint16(d[2:4])
+
 	return nil
 }
 
@@ -121,7 +129,7 @@ func (rf *RangeField1) NumObjects() int {
 	return int(rf.Stop - rf.Start + 1)
 }
 
-// RangeField2 4 byte start and stop values
+// RangeField2 4 byte start and stop values.
 type RangeField2 struct {
 	Start uint32
 	Stop  uint32
@@ -129,8 +137,10 @@ type RangeField2 struct {
 
 func (rf *RangeField2) ToBytes() []byte {
 	var o []byte
+
 	o = binary.LittleEndian.AppendUint32(o, rf.Start)
 	o = binary.LittleEndian.AppendUint32(o, rf.Stop)
+
 	return o
 }
 
@@ -138,8 +148,10 @@ func (rf *RangeField2) FromBytes(d []byte) error {
 	if len(d) != 8 {
 		return fmt.Errorf("requires 8 bytes, got %d", len(d))
 	}
+
 	rf.Start = binary.LittleEndian.Uint32(d[0:4])
 	rf.Stop = binary.LittleEndian.Uint32(d[4:8])
+
 	return nil
 }
 
@@ -153,7 +165,7 @@ func (rf *RangeField2) NumObjects() int {
 	return int(rf.Stop - rf.Start + 1)
 }
 
-// RangeField3 1 byte VIRTUAL start and stop values
+// RangeField3 1 byte VIRTUAL start and stop values.
 type RangeField3 struct {
 	Start uint8
 	Stop  uint8
@@ -167,8 +179,10 @@ func (rf *RangeField3) FromBytes(d []byte) error {
 	if len(d) != 2 {
 		return fmt.Errorf("requires 2 bytes, got %d", len(d))
 	}
+
 	rf.Start = d[0]
 	rf.Stop = d[1]
+
 	return nil
 }
 
@@ -182,7 +196,7 @@ func (rf *RangeField3) NumObjects() int {
 	return int(rf.Stop - rf.Start + 1)
 }
 
-// RangeField4 2 byte VIRTUAL start and stop values
+// RangeField4 2 byte VIRTUAL start and stop values.
 type RangeField4 struct {
 	Start uint16
 	Stop  uint16
@@ -190,8 +204,10 @@ type RangeField4 struct {
 
 func (rf *RangeField4) ToBytes() []byte {
 	var o []byte
+
 	o = binary.LittleEndian.AppendUint16(o, rf.Start)
 	o = binary.LittleEndian.AppendUint16(o, rf.Stop)
+
 	return o
 }
 
@@ -199,8 +215,10 @@ func (rf *RangeField4) FromBytes(d []byte) error {
 	if len(d) != 4 {
 		return fmt.Errorf("requires 4 bytes, got %d", len(d))
 	}
+
 	rf.Start = binary.LittleEndian.Uint16(d[0:2])
 	rf.Stop = binary.LittleEndian.Uint16(d[2:4])
+
 	return nil
 }
 
@@ -214,7 +232,7 @@ func (rf *RangeField4) NumObjects() int {
 	return int(rf.Stop - rf.Start + 1)
 }
 
-// RangeField5 4 byte VIRTUAL start and stop values
+// RangeField5 4 byte VIRTUAL start and stop values.
 type RangeField5 struct {
 	Start uint32
 	Stop  uint32
@@ -222,8 +240,10 @@ type RangeField5 struct {
 
 func (rf *RangeField5) ToBytes() []byte {
 	var o []byte
+
 	o = binary.LittleEndian.AppendUint32(o, rf.Start)
 	o = binary.LittleEndian.AppendUint32(o, rf.Stop)
+
 	return o
 }
 
@@ -231,8 +251,10 @@ func (rf *RangeField5) FromBytes(d []byte) error {
 	if len(d) != 8 {
 		return fmt.Errorf("requires 8 bytes, got %d", len(d))
 	}
+
 	rf.Start = binary.LittleEndian.Uint32(d[0:4])
 	rf.Stop = binary.LittleEndian.Uint32(d[4:8])
+
 	return nil
 }
 
@@ -246,7 +268,7 @@ func (rf *RangeField5) NumObjects() int {
 	return int(rf.Stop - rf.Start + 1)
 }
 
-// RangeField6 - No Range Field: used, Implies all values
+// RangeField6 - No Range Field: used, Implies all values.
 type RangeField6 struct{}
 
 func (rf *RangeField6) ToBytes() []byte {
@@ -255,8 +277,9 @@ func (rf *RangeField6) ToBytes() []byte {
 
 func (rf *RangeField6) FromBytes(d []byte) error {
 	if len(d) > 0 {
-		return fmt.Errorf("error Range Field: 6 is an empty Range Field")
+		return errors.New("error Range Field: 6 is an empty Range Field")
 	}
+
 	return nil
 }
 
@@ -264,7 +287,7 @@ func (rf *RangeField6) String() string { return "" }
 
 func (rf *RangeField6) NumObjects() int { return 0 }
 
-// RangeField7 1 byte count of objects
+// RangeField7 1 byte count of objects.
 type RangeField7 struct {
 	Count uint8
 }
@@ -277,7 +300,9 @@ func (rf *RangeField7) FromBytes(d []byte) error {
 	if len(d) != 1 {
 		return fmt.Errorf("requires 1 byte, got %d", len(d))
 	}
+
 	rf.Count = d[0]
+
 	return nil
 }
 
@@ -290,14 +315,16 @@ func (rf *RangeField7) NumObjects() int {
 	return int(rf.Count)
 }
 
-// RangeField8 2 byte count of objects
+// RangeField8 2 byte count of objects.
 type RangeField8 struct {
 	Count uint16
 }
 
 func (rf *RangeField8) ToBytes() []byte {
 	var o []byte
+
 	o = binary.LittleEndian.AppendUint16(o, rf.Count)
+
 	return o
 }
 
@@ -305,7 +332,9 @@ func (rf *RangeField8) FromBytes(d []byte) error {
 	if len(d) != 2 {
 		return fmt.Errorf("requires 2 byte, got %d", len(d))
 	}
+
 	rf.Count = binary.LittleEndian.Uint16(d)
+
 	return nil
 }
 
@@ -318,14 +347,16 @@ func (rf *RangeField8) NumObjects() int {
 	return int(rf.Count)
 }
 
-// RangeField9 4 byte count of objects
+// RangeField9 4 byte count of objects.
 type RangeField9 struct {
 	Count uint32
 }
 
 func (rf *RangeField9) ToBytes() []byte {
 	var o []byte
+
 	o = binary.LittleEndian.AppendUint32(o, rf.Count)
+
 	return o
 }
 
@@ -333,7 +364,9 @@ func (rf *RangeField9) FromBytes(d []byte) error {
 	if len(d) != 4 {
 		return fmt.Errorf("requires 4 byte, got %d", len(d))
 	}
+
 	rf.Count = binary.LittleEndian.Uint32(d[0:4])
+
 	return nil
 }
 
@@ -346,7 +379,7 @@ func (rf *RangeField9) NumObjects() int {
 	return int(rf.Count)
 }
 
-// RangeFieldB 1 byte count of objects with variable format
+// RangeFieldB 1 byte count of objects with variable format.
 type RangeFieldB struct {
 	Count uint8
 	// Variable ?
@@ -360,7 +393,9 @@ func (rf *RangeFieldB) FromBytes(d []byte) error {
 	if len(d) != 1 {
 		return fmt.Errorf("requires 1 byte, got %d", len(d))
 	}
+
 	rf.Count = d[0]
+
 	return nil
 }
 

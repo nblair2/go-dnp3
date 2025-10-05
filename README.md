@@ -1,6 +1,6 @@
 # go-dnp3
 
-[![GoDoc](https://godoc.org/github.com/nblair2/go-dnp3?status.svg)](https://godoc.org/github.com/nblair2/go-dnp3)
+[![GoDoc](https://godoc.org/github.com/nblair2/go-dnp3?status.svg)](https://godoc.org/github.com/nblair2/go-dnp3/dnp3)
 ![Go Version](https://img.shields.io/github/go-mod/go-version/nblair2/go-dnp3?filename=go.mod&style=flat-square)
 ![License](https://img.shields.io/github/license/nblair2/go-dnp3?style=flat-square)
 
@@ -13,17 +13,18 @@ DNP3 parsing in go.
 
 ## Improvements
 
+* [ ] accept interfaces, return structs
 * [ ] consistency on plural / singular of bits / bit and bytes / byte. Functions and attributes should be named based on what they actually are, and be as small as possible
 * [ ] errors always available / checked in `FromBytes` and `ToBytes` methods. Should buble these up but not fail if possible.
 * [ ] re-write a generic `Point` called `PointBytes` with flags and all possible fields (`Prefix`, `Flags`, `AbsTime`, `RelTime`) rather than the many different types we have now
 * [ ] clean up the the `String` method so we aren't always appending newlines, these should be the responsibility of the caller
 * [ ] consolidate the 3 different massive switch statements for Group / Variation into one
-* [ ] Always more point improvements (Events / Quality, Prefix parsing)
+* [ ] Events / Quality, Prefix parsing
 * [ ] `DIR` field / `PRM`
 
 ## Test
 
-Run `go test -v` to check a few different DNP3 messages. You can also use the `-args -pcaps=examples/opendnp3_test1.pcap` argument to pass in a full PCAP. Data taken from [opendnp3 conformance reports](https://dnp3.github.io/conformance/report.html).
+Run `go test ./dnp3 -v` to check a few different DNP3 messages. You can also use the `-args -pcaps=opendnp3_test1.pcap` argument to pass in a full PCAP. Data taken from [opendnp3 conformance reports](https://dnp3.github.io/conformance/report.html).
 
 ## Spec
 

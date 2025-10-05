@@ -4,9 +4,9 @@ import (
 	"fmt"
 )
 
-// DNP3Transport is the second layer of DNP3, and allows for fragmentation
+// Transport is the second layer of DNP3, and allows for fragmentation
 // and subsequent reassembly of application data. In addition to trans header,
-// DNP3Transport also intersperses CRC checksums after every 16 bytes
+// DNP3Transport also intersperses CRC checksums after every 16 bytes.
 type Transport struct {
 	FIN bool
 	FIR bool
@@ -29,11 +29,12 @@ func (trans *Transport) FromBytes(d []byte) ([]byte, error) {
 }
 
 func (trans *Transport) ToByte() byte {
-	var o byte = 0
+	var o byte
 
 	if trans.FIN {
 		o |= 0b10000000
 	}
+
 	if trans.FIR {
 		o |= 0b01000000
 	}

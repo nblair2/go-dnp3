@@ -44,7 +44,7 @@ var dnp3CRCTable = [256]uint16{
 
 // CalculateDNP3CRC computes a 16-bit cyclic redundancy check (CRC) for
 // arbitrary length byte slices using the defined DNP3 polynomial
-// (10011110101100101)
+// (10011110101100101).
 func CalculateDNP3CRC(data []byte) []byte {
 	crc := uint16(0)
 
@@ -52,6 +52,7 @@ func CalculateDNP3CRC(data []byte) []byte {
 		temp := byte(crc) ^ b&0xFF
 		crc = (crc >> 8) ^ dnp3CRCTable[temp]
 	}
+
 	crc = ^crc
 
 	return []byte{byte(crc & 0xFF), byte((crc >> 8) & 0xFF)}
@@ -63,6 +64,7 @@ func CalculateDNP3CRC(data []byte) []byte {
 // application data.
 func InsertDNP3CRCs(data []byte) []byte {
 	const blockSize = 16
+
 	var result []byte
 
 	for i := 0; i < len(data); i += blockSize {
@@ -70,7 +72,7 @@ func InsertDNP3CRCs(data []byte) []byte {
 		end = min(end, len(data))
 		block := data[i:end]
 		result = append(result, block...)
-		result = append(result, CalculateDNP3CRC(block)[:]...)
+		result = append(result, CalculateDNP3CRC(block)...)
 	}
 
 	return result
@@ -103,18 +105,19 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 				block, crc, calc)
 		}
 
-		clean = append(clean, block[:]...)
+		clean = append(clean, block...)
 		crcs = append(crcs, crc)
 	}
 
 	return crcs, clean, nil
 }
 
-// TODO error checking for both
+// TODO error checking for both.
 func bytesToDNP3TimeAbsolute(b []byte) time.Time {
 	var padded [8]byte
 	copy(padded[:6], b)
 	ms := binary.LittleEndian.Uint64(padded[:])
+
 	return time.Unix(0, int64(ms)*int64(time.Millisecond))
 }
 
@@ -122,12 +125,14 @@ func dnp3TimeAbsoluteToBytes(t time.Time) []byte {
 	ms := uint64(t.UnixNano() / int64(time.Millisecond))
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, ms)
+
 	return b[:6]
 }
 
-// TODO make this a time duration
+// TODO make this a time duration.
 func bytesTodnp3TimeRelative(b []byte) time.Duration {
 	ms := uint16(b[0]) | uint16(b[1])<<8
+
 	return time.Duration(ms) * time.Millisecond
 }
 
@@ -136,5 +141,6 @@ func dnp3TimeRelativeToBytes(d time.Duration) []byte {
 	b := make([]byte, 2)
 	b[0] = byte(ms & 0xFF)
 	b[1] = byte((ms >> 8) & 0xFF)
+
 	return b
 }

@@ -7,7 +7,7 @@ import (
 )
 
 // DataLink is the highest layer of DNP3. Each DNP3 frame starts with a
-// data link header (8 bytes, 2 byte CRC)
+// data link header (8 bytes, 2 byte CRC).
 type DataLink struct {
 	SYN [2]byte
 	LEN uint16
@@ -39,27 +39,27 @@ func (dl *DataLink) FromBytes(d []byte) error {
 	return nil
 }
 
-func (d *DataLink) ToBytes() []byte {
+func (dl *DataLink) ToBytes() []byte {
 	var out []byte
 
 	// Set SYN bytes (in case we initialized an empty packet)
-	d.SYN = [2]byte{0x05, 0x64}
+	dl.SYN = [2]byte{0x05, 0x64}
 
 	// LEN needs to be updated externally
 
-	out = append(out, d.SYN[:]...)
-	out = append(out, byte(d.LEN))
-	out = append(out, d.CTL.ToByte())
-	out = binary.LittleEndian.AppendUint16(out, d.DST)
-	out = binary.LittleEndian.AppendUint16(out, d.SRC)
+	out = append(out, dl.SYN[:]...)
+	out = append(out, byte(dl.LEN))
+	out = append(out, dl.CTL.ToByte())
+	out = binary.LittleEndian.AppendUint16(out, dl.DST)
+	out = binary.LittleEndian.AppendUint16(out, dl.SRC)
 
-	d.CRC = [2]byte(CalculateDNP3CRC(out))
-	out = append(out, d.CRC[:]...)
+	dl.CRC = [2]byte(CalculateDNP3CRC(out))
+	out = append(out, dl.CRC[:]...)
 
 	return out
 }
 
-func (d DataLink) String() string {
+func (dl *DataLink) String() string {
 	return fmt.Sprintf(`
 	Data Link:
 		SYN: 0x % X
@@ -67,7 +67,7 @@ func (d DataLink) String() string {
 		%s
 		DST: %d
 		SRC: %d`,
-		d.SYN, d.LEN, d.CTL.String(), d.DST, d.SRC)
+		dl.SYN, dl.LEN, dl.CTL.String(), dl.DST, dl.SRC)
 }
 
 // DataLinkControl is the 4th byte of the data link header.
@@ -76,7 +76,7 @@ type DataLinkCTL struct {
 	PRM bool
 	FCB bool              // ignoring checks to enforce dl to 0
 	FCV bool              // ignoring use of DFC
-	FC  DataLinkPrimaryFC //only 4 bits
+	FC  DataLinkPrimaryFC // only 4 bits
 }
 
 func (dlctl *DataLinkCTL) FromByte(d byte) {
@@ -88,17 +88,20 @@ func (dlctl *DataLinkCTL) FromByte(d byte) {
 }
 
 func (dlctl *DataLinkCTL) ToByte() byte {
-	var o byte = 0
+	var o byte
 
 	if dlctl.DIR {
 		o |= 0b10000000
 	}
+
 	if dlctl.PRM {
 		o |= 0b01000000
 	}
+
 	if dlctl.FCB {
 		o |= 0b00100000
 	}
+
 	if dlctl.FCV {
 		o |= 0b00010000
 	}
@@ -107,6 +110,7 @@ func (dlctl *DataLinkCTL) ToByte() byte {
 
 	return o
 }
+
 func (dlctl *DataLinkCTL) String() string {
 	return fmt.Sprintf(`CTL:
 			DIR: %t
@@ -118,7 +122,7 @@ func (dlctl *DataLinkCTL) String() string {
 		dlctl.FC.String())
 }
 
-// Function Codes (PRM set)
+// Function Codes (PRM set).
 type DataLinkPrimaryFC uint8
 
 const (
@@ -141,10 +145,11 @@ func (fc DataLinkPrimaryFC) String() string {
 	if name, ok := DataLinkPrimaryFCNames[fc]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("unknown Function Code %d", fc)
 }
 
-// Function Codes (PRM unset)
+// Function Codes (PRM unset).
 type DataLinkSecondaryFC uint8
 
 const (
@@ -165,5 +170,6 @@ func (fc DataLinkSecondaryFC) String() string {
 	if name, ok := DataLinkSecondaryFCNames[fc]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("unknown Function Code %d", fc)
 }

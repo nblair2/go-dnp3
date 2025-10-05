@@ -1,9 +1,10 @@
-package dnp3
+package dnp3_test
 
 import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -11,34 +12,14 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/nblair2/go-dnp3/dnp3/dnp3"
 )
 
-func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
-	d := DNP3{}
-	err := d.FromBytes(input)
-	if err != nil {
-		t.Fatal("FromBytes:", err)
-	}
+var (
+	customPcapsFlag string
+	customPcaps     []string
 
-	output, err := d.ToBytes()
-	if err != nil {
-		t.Fatal("ToBytes:", err)
-	}
-
-	if !slices.Equal(input, output) {
-		t.Fatal("Input and Output not equal")
-	}
-
-	_ = d.String()
-
-	_, err = json.MarshalIndent(d, "", "  ")
-	if err != nil {
-		t.Fatal("MarshalIndent:", err)
-	}
-}
-
-func TestDNP3(t *testing.T) {
-	tests := []struct {
+	tests = []struct {
 		name  string
 		input []byte
 	}{
@@ -116,44 +97,41 @@ func TestDNP3(t *testing.T) {
 			},
 		},
 	}
+)
+
+func TestMain(m *testing.M) {
+	flag.StringVar(&customPcapsFlag, "pcaps", "", "Comma-separated list of pcap files to read")
+	flag.Parse()
+
+	if customPcapsFlag != "" {
+		customPcaps = splitComma(customPcapsFlag)
+	}
+
+	os.Exit(m.Run())
+}
+
+func TestDNP3(t *testing.T) {
+	t.Parallel()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			testFromBytesToBytesStringMarshal(t, tc.input)
 		})
 	}
 }
 
-var custPcaps []string
-
-func init() {
-	flag.Func("pcaps", "Comma-separated list of pcap files to read", func(val string) error {
-		if val != "" {
-			custPcaps = append(custPcaps, splitComma(val)...)
-		}
-		return nil
-	})
-}
-
-func splitComma(s string) []string {
-	var out []string
-	for _, v := range strings.Split(s, ",") {
-		v = strings.TrimSpace(v)
-		if v != "" {
-			out = append(out, v)
-		}
-	}
-	return out
-}
-
 func TestCustomPcaps(t *testing.T) {
+	t.Parallel()
 	flag.Parse()
-	if len(custPcaps) == 0 {
+
+	if len(customPcaps) == 0 {
 		t.Skip("No custom pcap file provided")
 	}
 
-	for _, pcapFile := range custPcaps {
+	for _, pcapFile := range customPcaps {
 		t.Run(pcapFile, func(t *testing.T) {
+			t.Parallel()
 
 			handle, err := pcap.OpenOffline(pcapFile)
 			if err != nil {
@@ -162,14 +140,15 @@ func TestCustomPcaps(t *testing.T) {
 			defer handle.Close()
 
 			pcap := gopacket.NewPacketSource(handle, handle.LinkType())
+
 			i := 0
 			for pkt := range pcap.Packets() {
+				i++
 
-				i += 1
 				tcpLayer := pkt.Layer(layers.LayerTypeTCP)
 				if tcpLayer != nil {
-
 					tcp, _ := tcpLayer.(*layers.TCP)
+
 					input := tcp.Payload
 					if len(input) < 10 {
 						continue
@@ -182,4 +161,44 @@ func TestCustomPcaps(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
+	t.Helper()
+
+	d := dnp3.DNP3{}
+
+	err := d.FromBytes(input)
+	if err != nil {
+		t.Fatal("FromBytes:", err)
+	}
+
+	output, err := d.ToBytes()
+	if err != nil {
+		t.Fatal("ToBytes:", err)
+	}
+
+	if !slices.Equal(input, output) {
+		t.Fatal("Input and Output not equal")
+	}
+
+	_ = d.String()
+
+	_, err = json.MarshalIndent(d, "", "  ")
+	if err != nil {
+		t.Fatal("MarshalIndent:", err)
+	}
+}
+
+func splitComma(s string) []string {
+	var out []string
+
+	for _, v := range strings.Split(s, ",") {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+
+	return out
 }
