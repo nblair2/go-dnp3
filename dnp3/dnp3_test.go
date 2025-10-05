@@ -12,7 +12,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/nblair2/go-dnp3/dnp3/dnp3"
+	"github.com/nblair2/go-dnp3/dnp3"
 )
 
 var (
