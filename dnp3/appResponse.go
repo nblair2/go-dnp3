@@ -1,10 +1,11 @@
 package dnp3
 
 import (
+	"errors"
 	"fmt"
 )
 
-// DNP3ApplicationResponse is sent from outstation to master
+// DNP3ApplicationResponse is sent from outstation to master.
 type ApplicationResponse struct {
 	CTL  ApplicationCTL
 	FC   ResponseFC
@@ -14,26 +15,36 @@ type ApplicationResponse struct {
 
 func (appresp *ApplicationResponse) FromBytes(d []byte) error {
 	appresp.CTL.FromByte(d[0])
+
 	appresp.FC = ResponseFC(d[1])
-	if err := appresp.IIN.FromBytes(d[2], d[3]); err != nil {
+
+	err := appresp.IIN.FromBytes(d[2], d[3])
+	if err != nil {
 		return fmt.Errorf("can't create application response: %w", err)
 	}
-	if err := appresp.Data.FromBytes(d[4:]); err != nil {
-		return fmt.Errorf("couldn't create AppReq Data FromBytes: %v", err)
+
+	err = appresp.Data.FromBytes(d[4:])
+	if err != nil {
+		return fmt.Errorf("couldn't create AppReq Data FromBytes: %w", err)
 	}
+
 	return nil
 }
 
 func (appresp *ApplicationResponse) ToBytes() ([]byte, error) {
 	var o []byte
+
 	o = append(o, appresp.CTL.ToByte())
 	o = append(o, byte(appresp.FC))
 	o = append(o, appresp.IIN.ToBytes()...)
+
 	b, err := appresp.Data.ToBytes()
 	if err != nil {
-		return o, fmt.Errorf("error encoding data: %v", err)
+		return o, fmt.Errorf("error encoding data: %w", err)
 	}
+
 	o = append(o, b...)
+
 	return o, nil
 }
 
@@ -45,10 +56,12 @@ func (appresp *ApplicationResponse) String() string {
 		%s`,
 		appresp.CTL.String(), appresp.FC, appresp.FC.String(),
 		appresp.IIN.String())
+
 	d := appresp.Data.String()
 	if d != "" {
 		o += "\n\t\t" + d
 	}
+
 	return o
 }
 
@@ -68,7 +81,9 @@ func (appresp *ApplicationResponse) SetSequence(s uint8) error {
 	if s >= 0b00001111 {
 		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
 	}
+
 	appresp.CTL.SEQ = s
+
 	return nil
 }
 
@@ -88,7 +103,7 @@ func (appresp *ApplicationResponse) SetData(d ApplicationData) {
 	appresp.Data = d
 }
 
-// DNP3 Application ResponseFC specify the action the outstation is taking
+// DNP3 Application ResponseFC specify the action the outstation is taking.
 type ResponseFC byte
 
 const (
@@ -107,10 +122,11 @@ func (fc ResponseFC) String() string {
 	if name, ok := ResponseFCNames[fc]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("unknown Function Code %d", fc)
 }
 
-// DNP3ApplicationResponse header (information about outstation)
+// DNP3ApplicationResponse header (information about outstation).
 type ApplicationIIN struct {
 	// IIN 1
 	AllStations   bool
@@ -148,67 +164,48 @@ func (appiin *ApplicationIIN) FromBytes(lsb, msb byte) error {
 	appiin.AlreadyExiting = (msb & 0b00010000) != 0
 	appiin.BadConfiguration = (msb & 0b00100000) != 0
 	appiin.Reserved1 = (msb & 0b01000000) != 0
+
 	appiin.Reserved2 = (msb & 0b10000000) != 0
 	if (msb & 0b11000000) != 0 {
-		return fmt.Errorf("IIN 2.6 and 2.7 must be set to 0")
+		return errors.New("IIN 2.6 and 2.7 must be set to 0")
 	}
+
 	return nil
 }
 
-func (d *ApplicationIIN) ToBytes() []byte {
-	var lsb, msb byte
+func boolToBits(bools []bool) byte {
+	var out byte
 
-	// IIN 1 (lsb)
-	if d.AllStations {
-		lsb |= 0b00000001
-	}
-	if d.Class1Events {
-		lsb |= 0b00000010
-	}
-	if d.Class2Events {
-		lsb |= 0b00000100
-	}
-	if d.Class3Events {
-		lsb |= 0b00001000
-	}
-	if d.NeedTime {
-		lsb |= 0b00010000
-	}
-	if d.Local {
-		lsb |= 0b00100000
-	}
-	if d.DeviceTrouble {
-		lsb |= 0b01000000
-	}
-	if d.Restart {
-		lsb |= 0b10000000
+	for i, v := range bools {
+		if v {
+			out |= 1 << i
+		}
 	}
 
-	// IIN 2 (msb)
-	if d.BadFunction {
-		msb |= 0b00000001
-	}
-	if d.ObjectUnknown {
-		msb |= 0b00000010
-	}
-	if d.ParameterError {
-		msb |= 0b00000100
-	}
-	if d.BufferOverflow {
-		msb |= 0b00001000
-	}
-	if d.AlreadyExiting {
-		msb |= 0b00010000
-	}
-	if d.BadConfiguration {
-		msb |= 0b00100000
-	}
-	if d.Reserved1 {
-		msb |= 0b01000000
-	}
-	if d.Reserved2 {
-		msb |= 0b10000000
-	}
+	return out
+}
+
+func (appiin *ApplicationIIN) ToBytes() []byte {
+	lsb := boolToBits([]bool{
+		appiin.AllStations,
+		appiin.Class1Events,
+		appiin.Class2Events,
+		appiin.Class3Events,
+		appiin.NeedTime,
+		appiin.Local,
+		appiin.DeviceTrouble,
+		appiin.Restart,
+	})
+	msb := boolToBits([]bool{
+		appiin.BadFunction,
+		appiin.ObjectUnknown,
+		appiin.ParameterError,
+		appiin.BufferOverflow,
+		appiin.AlreadyExiting,
+		appiin.BadConfiguration,
+		appiin.Reserved1,
+		appiin.Reserved2,
+	})
 
 	return []byte{lsb, msb}
 }

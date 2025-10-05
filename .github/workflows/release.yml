@@ -1,0 +1,31 @@
+name: release
+
+on:
+  workflow_run:
+    workflows: [ "CI" ]
+    types: [ completed ]
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release:
+    name: Run release-please
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release-type: go
+      - name: Show release info
+        run: |
+          echo "Release created?  ${{ steps.release.outputs.release_created }}"
+          echo "Tag name:  ${{ steps.release.outputs.tag_name }}"
+          echo "Release notes body:  ${{ steps.release.outputs.body}}"

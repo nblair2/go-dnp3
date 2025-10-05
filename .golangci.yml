@@ -1,0 +1,161 @@
+version: "2"
+linters:
+  enable:
+    - arangolint
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - dupword
+    - durationcheck
+    - embeddedstructfieldcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exhaustruct
+    - exptostd
+    - fatcontext
+    - forbidigo
+    - forcetypeassert
+    - funcorder
+    - funlen
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gochecksumtype
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godoclint
+    - godot
+    - godox
+    - goheader
+    - gomoddirectives
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosmopolitan
+    - govet
+    - grouper
+    - iface
+    - importas
+    - inamedparam
+    - ineffassign
+    - intrange
+    - iotamixing
+    - ireturn
+    - lll
+    - loggercheck
+    - maintidx
+    - makezero
+    - mirror
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - nlreturn
+    - noctx
+    - noinlineerr
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    - perfsprint
+    - prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - tagalign
+    - tagliatelle
+    - testableexamples
+    - testifylint
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - unqueryvet
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl_v5
+    - zerologlint
+  exclusions:
+    warn-unused: true
+    rules:
+      # Never
+      - linters:
+          - forbidigo
+        path: dnp3/dnp3.go
+      - linters:
+          - godox
+        text: "Line contains TODO/BUG/FIXME"
+      - linters:
+          - gosec
+        text: "G115: integer overflow conversion"
+      # Soonish
+      - linters:
+          - revive
+        text: "should have comment or be unexported"
+      - linters:
+          - revive 
+        text: "exported: "
+      # Soonest
+      - linters:
+          - funlen
+          - maintidx
+        text: "getPointsConstructor"
+      - linters:
+          - funlen
+          - maintidx
+        text: "getGroupVariationDescription"
+      - linters:
+          - funlen
+        text: "Function 'newRangeFieldFromSpec' has too many statements"
+        path: dnp3/appDataHeader.go
+
+  disable:
+    - cyclop     # re-add soonest (with gocyclo)
+    - depguard
+    - err113
+    - exhaustruct
+    - interfacebloat
+    - ireturn    # re-add soonest
+    - gochecknoglobals
+    - gocyclo    # re-add soonest (with cyclop)
+    - godoclint  # re-add eventually (revive comment/unexported too)
+    - mnd
+    - musttag
+    - varnamelen # re-add eventually
+
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines

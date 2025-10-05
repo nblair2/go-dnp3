@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// DNP3 ApplicationRequest are sent from the master to the outstation
+// DNP3 ApplicationRequest are sent from the master to the outstation.
 type ApplicationRequest struct {
 	CTL  ApplicationCTL
 	FC   RequestFC
@@ -12,24 +12,31 @@ type ApplicationRequest struct {
 }
 
 func (appreq *ApplicationRequest) FromBytes(d []byte) error {
-
 	appreq.CTL.FromByte(d[0])
+
 	appreq.FC = RequestFC(d[1])
-	if err := appreq.Data.FromBytes(d[2:]); err != nil {
-		return fmt.Errorf("couldn't create AppReq Data FromBytes: %v", err)
+
+	err := appreq.Data.FromBytes(d[2:])
+	if err != nil {
+		return fmt.Errorf("couldn't create AppReq Data FromBytes: %w", err)
 	}
+
 	return nil
 }
 
 func (appreq *ApplicationRequest) ToBytes() ([]byte, error) {
 	var o []byte
+
 	o = append(o, appreq.CTL.ToByte())
 	o = append(o, byte(appreq.FC))
+
 	b, err := appreq.Data.ToBytes()
 	if err != nil {
-		return o, fmt.Errorf("couldn't convert AppReq Data ToBytes: %v", err)
+		return o, fmt.Errorf("couldn't convert AppReq Data ToBytes: %w", err)
 	}
+
 	o = append(o, b...)
+
 	return o, nil
 }
 
@@ -39,10 +46,12 @@ func (appreq *ApplicationRequest) String() string {
 		%s
 		FC : (%d) %s`,
 		appreq.CTL.String(), appreq.FC, appreq.FC.String())
+
 	d := appreq.Data.String()
 	if d != "" {
 		o += "\n\t\t" + d
 	}
+
 	return o
 }
 
@@ -62,7 +71,9 @@ func (appreq *ApplicationRequest) SetSequence(s uint8) error {
 	if s >= 0b00001111 {
 		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
 	}
+
 	appreq.CTL.SEQ = s
+
 	return nil
 }
 
@@ -73,6 +84,7 @@ func (appreq *ApplicationRequest) GetFunctionCode() byte {
 func (appreq *ApplicationRequest) SetFunctionCode(d byte) {
 	appreq.FC = RequestFC(d)
 }
+
 func (appreq *ApplicationRequest) GetData() ApplicationData {
 	return appreq.Data
 }
@@ -82,7 +94,7 @@ func (appreq *ApplicationRequest) SetData(d ApplicationData) {
 }
 
 // DNP3 Application RequestFC specify the action the master is directing the
-// outstation to take
+// outstation to take.
 type RequestFC byte
 
 const (
@@ -119,7 +131,7 @@ const (
 	AbortFile
 	ActivateConfig
 	AuthenticationRequest
-	AuthenticationRequestNoAck //0x21
+	AuthenticationRequestNoAck // 0x21
 )
 
 var RequestFCNames = map[RequestFC]string{
@@ -162,5 +174,6 @@ func (fc RequestFC) String() string {
 	if name, ok := RequestFCNames[fc]; ok {
 		return name
 	}
+
 	return fmt.Sprintf("Unknown Function Code %d", fc)
 }
