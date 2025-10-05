@@ -1,7 +1,8 @@
 name: release
 
 on:
-  branches: [ "main" ]
+  push:
+    branches: [ "main" ]
 
 permissions:
   contents: write
