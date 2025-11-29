@@ -13,17 +13,17 @@ type ApplicationResponse struct {
 	Data ApplicationData
 }
 
-func (appresp *ApplicationResponse) FromBytes(d []byte) error {
-	appresp.CTL.FromByte(d[0])
+func (appresp *ApplicationResponse) FromBytes(data []byte) error {
+	appresp.CTL.FromByte(data[0])
 
-	appresp.FC = ResponseFC(d[1])
+	appresp.FC = ResponseFC(data[1])
 
-	err := appresp.IIN.FromBytes(d[2], d[3])
+	err := appresp.IIN.FromBytes(data[2], data[3])
 	if err != nil {
 		return fmt.Errorf("can't create application response: %w", err)
 	}
 
-	err = appresp.Data.FromBytes(d[4:])
+	err = appresp.Data.FromBytes(data[4:])
 	if err != nil {
 		return fmt.Errorf("couldn't create AppReq Data FromBytes: %w", err)
 	}
@@ -32,37 +32,38 @@ func (appresp *ApplicationResponse) FromBytes(d []byte) error {
 }
 
 func (appresp *ApplicationResponse) ToBytes() ([]byte, error) {
-	var o []byte
+	var encoded []byte
 
-	o = append(o, appresp.CTL.ToByte())
-	o = append(o, byte(appresp.FC))
-	o = append(o, appresp.IIN.ToBytes()...)
-
-	b, err := appresp.Data.ToBytes()
+	ctlByte, err := appresp.CTL.ToByte()
 	if err != nil {
-		return o, fmt.Errorf("error encoding data: %w", err)
+		return encoded, fmt.Errorf("error encoding application control: %w", err)
 	}
 
-	o = append(o, b...)
+	encoded = append(encoded, ctlByte)
+	encoded = append(encoded, byte(appresp.FC))
+	encoded = append(encoded, appresp.IIN.ToBytes()...)
 
-	return o, nil
+	dataBytes, err := appresp.Data.ToBytes()
+	if err != nil {
+		return encoded, fmt.Errorf("error encoding data: %w", err)
+	}
+
+	encoded = append(encoded, dataBytes...)
+
+	return encoded, nil
 }
 
 func (appresp *ApplicationResponse) String() string {
-	o := fmt.Sprintf(`
-	Application (Response):
-		%s
-		FC : (%d) %s
-		%s`,
-		appresp.CTL.String(), appresp.FC, appresp.FC.String(),
-		appresp.IIN.String())
+	responseString := fmt.Sprintf("Application (Response):\n%s\n\tFC : (%d) %s\n%s",
+		indent(appresp.CTL.String(), "\t"), appresp.FC, appresp.FC.String(),
+		indent(appresp.IIN.String(), "\t"))
 
-	d := appresp.Data.String()
-	if d != "" {
-		o += "\n\t\t" + d
+	dataString := appresp.Data.String()
+	if dataString != "" {
+		responseString += "\n" + indent(dataString, "\t")
 	}
 
-	return o
+	return responseString
 }
 
 func (appresp *ApplicationResponse) GetCTL() ApplicationCTL {
@@ -91,19 +92,21 @@ func (appresp *ApplicationResponse) GetFunctionCode() byte {
 	return byte(appresp.FC)
 }
 
-func (appresp *ApplicationResponse) SetFunctionCode(d byte) {
-	appresp.FC = ResponseFC(d)
+func (appresp *ApplicationResponse) SetFunctionCode(code byte) {
+	appresp.FC = ResponseFC(code)
 }
 
 func (appresp *ApplicationResponse) GetData() ApplicationData {
 	return appresp.Data
 }
 
-func (appresp *ApplicationResponse) SetData(d ApplicationData) {
-	appresp.Data = d
+func (appresp *ApplicationResponse) SetData(payload ApplicationData) {
+	appresp.Data = payload
 }
 
 // DNP3 Application ResponseFC specify the action the outstation is taking.
+//
+//go:generate stringer -type=ResponseFC
 type ResponseFC byte
 
 const (
@@ -111,20 +114,6 @@ const (
 	UnsolicitedResponse
 	AuthenticationResponse
 )
-
-var ResponseFCNames = map[ResponseFC]string{
-	Response:               "RESPONSE",
-	UnsolicitedResponse:    "UNSOLICITED_RESPONSE",
-	AuthenticationResponse: "AUTHENTICATION_RESPONSE",
-}
-
-func (fc ResponseFC) String() string {
-	if name, ok := ResponseFCNames[fc]; ok {
-		return name
-	}
-
-	return fmt.Sprintf("unknown Function Code %d", fc)
-}
 
 // DNP3ApplicationResponse header (information about outstation).
 type ApplicationIIN struct {
@@ -212,22 +201,22 @@ func (appiin *ApplicationIIN) ToBytes() []byte {
 
 func (appiin *ApplicationIIN) String() string {
 	return fmt.Sprintf(`IIN:
-			IIN1:
-			AllStations     : %t
-			Class1Events    : %t
-			Class2Events    : %t
-			Class3Events    : %t
-			NeedTime        : %t
-			Local           : %t
-			DeviceTrouble   : %t
-			Restart         : %t
-			IIN2:
-			BadFunction     : %t
-			ObjectUnknown   : %t
-			ParameterError  : %t
-			BufferOverflow  : %t
-			AlreadyExiting  : %t
-			BadConfiguration: %t`,
+	IIN1:
+	AllStations     : %t
+	Class1Events    : %t
+	Class2Events    : %t
+	Class3Events    : %t
+	NeedTime        : %t
+	Local           : %t
+	DeviceTrouble   : %t
+	Restart         : %t
+	IIN2:
+	BadFunction     : %t
+	ObjectUnknown   : %t
+	ParameterError  : %t
+	BufferOverflow  : %t
+	AlreadyExiting  : %t
+	BadConfiguration: %t`,
 		appiin.AllStations, appiin.Class1Events, appiin.Class2Events,
 		appiin.Class3Events, appiin.NeedTime, appiin.Local, appiin.DeviceTrouble,
 		appiin.Restart, appiin.BadFunction, appiin.ObjectUnknown,

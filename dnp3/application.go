@@ -30,44 +30,48 @@ type ApplicationCTL struct {
 	SEQ uint8 // 4 bits
 }
 
-func (appctl *ApplicationCTL) FromByte(d byte) {
-	appctl.FIR = (d & 0b10000000) != 0
-	appctl.FIN = (d & 0b01000000) != 0
-	appctl.CON = (d & 0b00100000) != 0
-	appctl.UNS = (d & 0b00010000) != 0
-	appctl.SEQ = (d & 0b00001111)
+func (appctl *ApplicationCTL) FromByte(value byte) {
+	appctl.FIR = (value & 0b10000000) != 0
+	appctl.FIN = (value & 0b01000000) != 0
+	appctl.CON = (value & 0b00100000) != 0
+	appctl.UNS = (value & 0b00010000) != 0
+	appctl.SEQ = (value & 0b00001111)
 }
 
-func (appctl *ApplicationCTL) ToByte() byte {
-	var o byte
+func (appctl *ApplicationCTL) ToByte() (byte, error) {
+	var ctlByte byte
 
 	if appctl.FIR {
-		o |= 0b10000000
+		ctlByte |= 0b10000000
 	}
 
 	if appctl.FIN {
-		o |= 0b01000000
+		ctlByte |= 0b01000000
 	}
 
 	if appctl.CON {
-		o |= 0b00100000
+		ctlByte |= 0b00100000
 	}
 
 	if appctl.UNS {
-		o |= 0b00010000
+		ctlByte |= 0b00010000
 	}
 
-	o |= (appctl.SEQ & 0b00001111)
+	if appctl.SEQ > 15 {
+		return 0, fmt.Errorf("sequence number %d exceeds 4 bits", appctl.SEQ)
+	}
 
-	return o
+	ctlByte |= (appctl.SEQ & 0b00001111)
+
+	return ctlByte, nil
 }
 
 func (appctl *ApplicationCTL) String() string {
 	return fmt.Sprintf(`CTL:
-			FIR: %t
-			FIN: %t
-			CON: %t
-			UNS: %t
-			SEQ: %d`,
+	FIR: %t
+	FIN: %t
+	CON: %t
+	UNS: %t
+	SEQ: %d`,
 		appctl.FIR, appctl.FIN, appctl.CON, appctl.UNS, appctl.SEQ)
 }

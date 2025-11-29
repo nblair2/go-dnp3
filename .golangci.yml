@@ -22,7 +22,6 @@ linters:
     - errname
     - errorlint
     - exhaustive
-    - exhaustruct
     - exptostd
     - fatcontext
     - forbidigo
@@ -37,7 +36,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - godoclint
+    # - godoclint
     - godot
     - godox
     - goheader
@@ -61,6 +60,8 @@ linters:
     - makezero
     - mirror
     - misspell
+    # - mnd
+    # - musttag
     - nakedret
     - nestif
     - nilerr
@@ -99,6 +100,7 @@ linters:
     - unused
     - usestdlibvars
     - usetesting
+    - varnamelen
     - wastedassign
     - whitespace
     - wrapcheck
@@ -112,45 +114,30 @@ linters:
           - forbidigo
         path: dnp3/dnp3.go
       - linters:
+          - forbidigo
+        path: dnp3/dnp3_test.go
+      - linters:
           - godox
         text: "Line contains TODO/BUG/FIXME"
-      - linters:
-          - gosec
-        text: "G115: integer overflow conversion"
-      # Soonish
+      # Maybe one day
       - linters:
           - revive
         text: "should have comment or be unexported"
       - linters:
           - revive 
         text: "exported: "
-      # Soonest
-      - linters:
-          - funlen
-          - maintidx
-        text: "getPointsConstructor"
-      - linters:
-          - funlen
-          - maintidx
-        text: "getGroupVariationDescription"
-      - linters:
-          - funlen
-        text: "Function 'newRangeFieldFromSpec' has too many statements"
-        path: dnp3/appDataHeader.go
 
   disable:
-    - cyclop     # re-add soonest (with gocyclo)
-    - depguard
-    - err113
-    - exhaustruct
-    - interfacebloat
-    - ireturn    # re-add soonest
-    - gochecknoglobals
-    - gocyclo    # re-add soonest (with cyclop)
-    - godoclint  # re-add eventually (revive comment/unexported too)
-    - mnd
-    - musttag
-    - varnamelen # re-add eventually
+    # Never
+    - depguard         # requires manual config of imports
+    - interfacebloat   # limits interfaces to 10 methods
+    - err113           # does not allow dynamic error
+    - exhaustruct      # does not allow empty struct initialization (something something OOP)
+    - gochecknoglobals # does not allow globals
+    - mnd              # does not allow magic numbers which is everywhere in protocol parsing
+    # Maybe one day
+    - godoclint        # re-add eventually (revive comment/unexported too)
+    - musttag          # structs that are json marshaled must be annoted with tags
 
 formatters:
   enable:

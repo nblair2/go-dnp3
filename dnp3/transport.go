@@ -14,41 +14,44 @@ type Transport struct {
 	CRC [][]byte
 }
 
-func (trans *Transport) FromBytes(d []byte) ([]byte, error) {
-	crcs, clean, err := RemoveDNP3CRCs(d)
+func (trans *Transport) FromBytes(data []byte) ([]byte, error) {
+	crcs, clean, err := RemoveDNP3CRCs(data)
 	if err != nil {
 		return nil, fmt.Errorf("can't remove crcs: %w", err)
 	}
 
-	trans.FIN = (d[0] & 0b10000000) != 0
-	trans.FIR = (d[0] & 0b01000000) != 0
-	trans.SEQ = (d[0] & 0b00111111)
+	trans.FIN = (data[0] & 0b10000000) != 0
+	trans.FIR = (data[0] & 0b01000000) != 0
+	trans.SEQ = (data[0] & 0b00111111)
 	trans.CRC = crcs
 
 	return clean[1:], nil
 }
 
-func (trans *Transport) ToByte() byte {
-	var o byte
+func (trans *Transport) ToByte() (byte, error) {
+	var transportByte byte
 
 	if trans.FIN {
-		o |= 0b10000000
+		transportByte |= 0b10000000
 	}
 
 	if trans.FIR {
-		o |= 0b01000000
+		transportByte |= 0b01000000
 	}
 
-	o |= (trans.SEQ & 0b00111111)
+	if trans.SEQ > 63 {
+		return 0, fmt.Errorf("transport sequence number %d exceeds 6 bits", trans.SEQ)
+	}
 
-	return o
+	transportByte |= (trans.SEQ & 0b00111111)
+
+	return transportByte, nil
 }
 
 func (trans *Transport) String() string {
-	return fmt.Sprintf(`
-	Transport:
-		FIN: %t
-		FIR: %t
-		SEQ: %d`,
+	return fmt.Sprintf(`Transport:
+	FIN: %t
+	FIR: %t
+	SEQ: %d`,
 		trans.FIN, trans.FIR, trans.SEQ)
 }

@@ -37,4 +37,4 @@ jobs:
       - name: Download Go modules
         run: go mod download
       - name: Run Go tests
-        run: make test
+        run: go test ./dnp3 -v -args -pcaps=opendnp3_test1.pcap

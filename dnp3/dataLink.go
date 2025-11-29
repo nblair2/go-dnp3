@@ -17,35 +17,38 @@ type DataLink struct {
 	CRC [2]byte
 }
 
-func (dl *DataLink) FromBytes(d []byte) error {
-	if d[0] != 0x05 || d[1] != 0x64 {
+func (dl *DataLink) FromBytes(data []byte) error {
+	if data[0] != 0x05 || data[1] != 0x64 {
 		return fmt.Errorf(
-			"first 2 bytes %#X don't match the magic bytes (0x0564)", d[:2])
+			"first 2 bytes %#X don't match the magic bytes (0x0564)", data[:2])
 	}
 
-	crc := CalculateDNP3CRC(d[:8])
-	if !slices.Equal(crc, d[8:10]) {
+	crc := CalculateDNP3CRC(data[:8])
+	if !slices.Equal(crc, data[8:10]) {
 		return fmt.Errorf(
-			"data link checksum %#X doesn't match CRC (%#X)", crc, d[8:10])
+			"data link checksum %#X doesn't match CRC (%#X)", crc, data[8:10])
 	}
 
 	dl.SYN = [2]byte{0x05, 0x64}
-	dl.LEN = uint16(d[2])
-	dl.CTL.FromByte(d[3])
-	dl.DST = binary.LittleEndian.Uint16(d[4:6])
-	dl.SRC = binary.LittleEndian.Uint16(d[6:8])
-	dl.CRC = [2]byte{d[8], d[9]}
+	dl.LEN = uint16(data[2])
+	dl.CTL.FromByte(data[3])
+	dl.DST = binary.LittleEndian.Uint16(data[4:6])
+	dl.SRC = binary.LittleEndian.Uint16(data[6:8])
+	dl.CRC = [2]byte{data[8], data[9]}
 
 	return nil
 }
 
-func (dl *DataLink) ToBytes() []byte {
+func (dl *DataLink) ToBytes() ([]byte, error) {
 	var out []byte
 
 	// Set SYN bytes (in case we initialized an empty packet)
 	dl.SYN = [2]byte{0x05, 0x64}
 
 	// LEN needs to be updated externally
+	if dl.LEN > 255 {
+		return nil, fmt.Errorf("length %d exceeds max byte value", dl.LEN)
+	}
 
 	out = append(out, dl.SYN[:]...)
 	out = append(out, byte(dl.LEN))
@@ -56,18 +59,17 @@ func (dl *DataLink) ToBytes() []byte {
 	dl.CRC = [2]byte(CalculateDNP3CRC(out))
 	out = append(out, dl.CRC[:]...)
 
-	return out
+	return out, nil
 }
 
 func (dl *DataLink) String() string {
-	return fmt.Sprintf(`
-	Data Link:
-		SYN: 0x % X
-		LEN: %d
-		%s
-		DST: %d
-		SRC: %d`,
-		dl.SYN, dl.LEN, dl.CTL.String(), dl.DST, dl.SRC)
+	return fmt.Sprintf(`Data Link:
+	SYN: 0x % X
+	LEN: %d
+	%s
+	DST: %d
+	SRC: %d`,
+		dl.SYN, dl.LEN, indent(dl.CTL.String(), "\t"), dl.DST, dl.SRC)
 }
 
 // DataLinkControl is the 4th byte of the data link header.
@@ -79,97 +81,70 @@ type DataLinkCTL struct {
 	FC  DataLinkPrimaryFC // only 4 bits
 }
 
-func (dlctl *DataLinkCTL) FromByte(d byte) {
-	dlctl.DIR = (d & 0b10000000) != 0
-	dlctl.PRM = (d & 0b01000000) != 0
-	dlctl.FCB = (d & 0b00100000) != 0
-	dlctl.FCV = (d & 0b00010000) != 0
-	dlctl.FC = DataLinkPrimaryFC(d & 0b00001111)
+func (dlctl *DataLinkCTL) FromByte(value byte) {
+	dlctl.DIR = (value & 0b10000000) != 0
+	dlctl.PRM = (value & 0b01000000) != 0
+	dlctl.FCB = (value & 0b00100000) != 0
+	dlctl.FCV = (value & 0b00010000) != 0
+	dlctl.FC = DataLinkPrimaryFC(value & 0b00001111)
 }
 
 func (dlctl *DataLinkCTL) ToByte() byte {
-	var o byte
+	var controlByte byte
 
 	if dlctl.DIR {
-		o |= 0b10000000
+		controlByte |= 0b10000000
 	}
 
 	if dlctl.PRM {
-		o |= 0b01000000
+		controlByte |= 0b01000000
 	}
 
 	if dlctl.FCB {
-		o |= 0b00100000
+		controlByte |= 0b00100000
 	}
 
 	if dlctl.FCV {
-		o |= 0b00010000
+		controlByte |= 0b00010000
 	}
 
-	o |= (uint8(dlctl.FC) & 0b00001111)
+	controlByte |= (uint8(dlctl.FC) & 0b00001111)
 
-	return o
+	return controlByte
 }
 
 func (dlctl *DataLinkCTL) String() string {
 	return fmt.Sprintf(`CTL:
-			DIR: %t
-			PRM: %t
-			FCB: %t
-			FCV: %t
-			FC : (%d) %s`,
+	DIR: %t
+	PRM: %t
+	FCB: %t
+	FCV: %t
+	FC : (%d) %s`,
 		dlctl.DIR, dlctl.PRM, dlctl.FCB, dlctl.FCV, dlctl.FC,
 		dlctl.FC.String())
 }
 
 // Function Codes (PRM set).
+//
+//go:generate stringer -type=DataLinkPrimaryFC
 type DataLinkPrimaryFC uint8
 
 const (
-	resetLinkStates     = 0x0 // FCV 0
-	testLinkStates      = 0x2 //     1
-	confirmedUserData   = 0x3 //     1
-	unconfirmedUserData = 0x4 //     0
-	requestLinkStatus   = 0x9 //     0
+	ResetLinkStates     DataLinkPrimaryFC = 0x0 // FCV 0
+	TestLinkStates      DataLinkPrimaryFC = 0x2 //     1
+	ConfirmedUserData   DataLinkPrimaryFC = 0x3 //     1
+	UnconfirmedUserData DataLinkPrimaryFC = 0x4 //     0
+	RequestLinkStatus   DataLinkPrimaryFC = 0x9 //     0
 )
 
-var DataLinkPrimaryFCNames = map[DataLinkPrimaryFC]string{
-	resetLinkStates:     "RESET_LINK_STATES",
-	testLinkStates:      "TEST_LINK_STATES",
-	confirmedUserData:   "CONFIRMED_USER_DATA",
-	unconfirmedUserData: "UNCONFIRMED_USER_DATA",
-	requestLinkStatus:   "REQUEST_LINK_STATUS",
-}
-
-func (fc DataLinkPrimaryFC) String() string {
-	if name, ok := DataLinkPrimaryFCNames[fc]; ok {
-		return name
-	}
-
-	return fmt.Sprintf("unknown Function Code %d", fc)
-}
-
 // Function Codes (PRM unset).
+//
+//go:generate stringer -type=DataLinkSecondaryFC
 type DataLinkSecondaryFC uint8
 
 const (
-	ack          = 0x0
-	nack         = 0x1
-	linkStatus   = 0xb
-	notSupported = 0xf
+	Ack          DataLinkSecondaryFC = 0x0
+	Nack         DataLinkSecondaryFC = 0x1
+	LinkStatus   DataLinkSecondaryFC = 0xb
+	NotSupported DataLinkSecondaryFC = 0xf
 )
-
-var DataLinkSecondaryFCNames = map[DataLinkSecondaryFC]string{
-	ack:          "ACK",
-	nack:         "NACK",
-	linkStatus:   "LINK_STATUS",
-	notSupported: "NOT_SUPPORTED",
-}
-
-func (fc DataLinkSecondaryFC) String() string {
-	if name, ok := DataLinkSecondaryFCNames[fc]; ok {
-		return name
-	}
-
-	return fmt.Sprintf("unknown Function Code %d", fc)
-}
