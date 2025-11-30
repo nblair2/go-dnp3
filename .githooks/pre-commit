@@ -2,6 +2,10 @@
 
 if (git diff --cached --name-only | grep --silent '\.go$'); then
 
+    make clean
+    make generate
+    git add *_string.go
+
     make lint
     if [ $? -ne 0 ]; then
         echo "golangci-lint failed. You can try 'make fix' to automatically fix some issues. Commit aborted."

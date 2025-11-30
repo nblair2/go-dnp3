@@ -18,6 +18,8 @@ import (
 var (
 	customPcapsFlag string
 	customPcaps     []string
+	printStringFlag bool
+	printJSONFlag   bool
 
 	tests = []struct {
 		name  string
@@ -101,6 +103,8 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.StringVar(&customPcapsFlag, "pcaps", "", "Comma-separated list of pcap files to read")
+	flag.BoolVar(&printStringFlag, "print-string", false, "Print packet string output")
+	flag.BoolVar(&printJSONFlag, "print-json", false, "Print packet json output")
 	flag.Parse()
 
 	if customPcapsFlag != "" {
@@ -141,9 +145,9 @@ func TestCustomPcaps(t *testing.T) {
 
 			pcap := gopacket.NewPacketSource(handle, handle.LinkType())
 
-			i := 0
+			packetIndex := 0
 			for pkt := range pcap.Packets() {
-				i++
+				packetIndex++
 
 				tcpLayer := pkt.Layer(layers.LayerTypeTCP)
 				if tcpLayer != nil {
@@ -154,7 +158,7 @@ func TestCustomPcaps(t *testing.T) {
 						continue
 					}
 
-					t.Run(fmt.Sprintf("Packet%d", i), func(t *testing.T) {
+					t.Run(fmt.Sprintf("Packet%d", packetIndex), func(t *testing.T) {
 						testFromBytesToBytesStringMarshal(t, input)
 					})
 				}
@@ -166,14 +170,23 @@ func TestCustomPcaps(t *testing.T) {
 func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
 	t.Helper()
 
-	d := dnp3.DNP3{}
+	packet := dnp3.Frame{}
 
-	err := d.FromBytes(input)
+	err := packet.FromBytes(input)
 	if err != nil {
 		t.Fatal("FromBytes:", err)
 	}
 
-	output, err := d.ToBytes()
+	if packet.Application != nil {
+		data := packet.Application.GetData()
+		if data.HasExtra() {
+			t.Fatalf(
+				"application parser used the `Extra` field meaining a Group/Variation is not supported or some error",
+			)
+		}
+	}
+
+	output, err := packet.ToBytes()
 	if err != nil {
 		t.Fatal("ToBytes:", err)
 	}
@@ -182,11 +195,18 @@ func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
 		t.Fatal("Input and Output not equal")
 	}
 
-	_ = d.String()
+	str := packet.String()
+	if printStringFlag {
+		fmt.Println(str)
+	}
 
-	_, err = json.MarshalIndent(d, "", "  ")
+	jsonBytes, err := json.MarshalIndent(packet, "", "  ")
 	if err != nil {
 		t.Fatal("MarshalIndent:", err)
+	}
+
+	if printJSONFlag {
+		fmt.Println(string(jsonBytes))
 	}
 }
 

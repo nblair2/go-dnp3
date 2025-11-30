@@ -3,8 +3,26 @@ package dnp3
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 	"slices"
+	"strings"
 	"time"
+)
+
+type RelativeTime time.Duration
+
+func (relativeTime RelativeTime) Duration() time.Duration {
+	return time.Duration(relativeTime)
+}
+
+func (relativeTime RelativeTime) String() string {
+	return time.Duration(relativeTime).String()
+}
+
+const (
+	absoluteTimeBytes       = 6
+	maxAbsoluteMilliseconds = (1 << (absoluteTimeBytes * 8)) - 1
+	maxRelativeMilliseconds = int64(math.MaxUint16)
 )
 
 var dnp3CRCTable = [256]uint16{
@@ -112,35 +130,79 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 	return crcs, clean, nil
 }
 
-// TODO error checking for both.
-func bytesToDNP3TimeAbsolute(b []byte) time.Time {
+func BytesToDNP3TimeAbsolute(data []byte) (time.Time, error) {
+	if len(data) < 6 {
+		return time.Time{}, fmt.Errorf("absolute time requires 6 bytes, got %d", len(data))
+	}
+
 	var padded [8]byte
-	copy(padded[:6], b)
-	ms := binary.LittleEndian.Uint64(padded[:])
+	copy(padded[:absoluteTimeBytes], data[:absoluteTimeBytes])
 
-	return time.Unix(0, int64(ms)*int64(time.Millisecond))
+	milliseconds := binary.LittleEndian.Uint64(padded[:])
+	if milliseconds > maxAbsoluteMilliseconds {
+		return time.Time{}, fmt.Errorf("absolute time overflow: %d", milliseconds)
+	}
+
+	if milliseconds > uint64(math.MaxInt64) {
+		return time.Time{}, fmt.Errorf("absolute time exceeds supported range: %d", milliseconds)
+	}
+
+	return time.UnixMilli(int64(milliseconds)), nil
 }
 
-func dnp3TimeAbsoluteToBytes(t time.Time) []byte {
-	ms := uint64(t.UnixNano() / int64(time.Millisecond))
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, ms)
+func DNP3TimeAbsoluteToBytes(value time.Time) ([]byte, error) {
+	milliseconds := value.UnixMilli()
+	if milliseconds < 0 {
+		return nil, fmt.Errorf("timestamp %v is negative", value)
+	} else if milliseconds > int64(maxAbsoluteMilliseconds) {
+		return nil, fmt.Errorf("timestamp %v exceeds max DNP3 time", value)
+	}
+	// #nosec G115 -- milliseconds range is clamped above
+	boundedMilliseconds := uint64(milliseconds)
 
-	return b[:6]
+	var encoded [8]byte
+
+	binary.LittleEndian.PutUint64(encoded[:], boundedMilliseconds)
+
+	return encoded[:6], nil
 }
 
-// TODO make this a time duration.
-func bytesTodnp3TimeRelative(b []byte) time.Duration {
-	ms := uint16(b[0]) | uint16(b[1])<<8
+func BytesToDNP3TimeRelative(data []byte) (RelativeTime, error) {
+	if len(data) < 2 {
+		return 0, fmt.Errorf("relative time requires 2 bytes, got %d", len(data))
+	}
 
-	return time.Duration(ms) * time.Millisecond
+	milliseconds := binary.LittleEndian.Uint16(data[:2])
+
+	return RelativeTime(time.Duration(milliseconds) * time.Millisecond), nil
 }
 
-func dnp3TimeRelativeToBytes(d time.Duration) []byte {
-	ms := uint16(d / time.Millisecond)
-	b := make([]byte, 2)
-	b[0] = byte(ms & 0xFF)
-	b[1] = byte((ms >> 8) & 0xFF)
+func DNP3TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
+	relativeDuration := relativeTime.Duration()
+	milliseconds := int64(relativeDuration / time.Millisecond)
 
-	return b
+	if milliseconds < 0 {
+		return nil, fmt.Errorf("relative time %v is negative", relativeTime)
+	} else if milliseconds > maxRelativeMilliseconds {
+		return nil, fmt.Errorf("relative time %v exceeds max DNP3 relative time", relativeTime)
+	}
+
+	// #nosec G115 -- milliseconds range is clamped above
+	boundedMilliseconds := uint16(milliseconds)
+
+	return []byte{byte(boundedMilliseconds & 0xFF), byte(boundedMilliseconds >> 8)}, nil
+}
+
+func indent(s, prefix string) string {
+	var lines []string
+
+	for _, line := range strings.Split(s, "\n") {
+		if line != "" {
+			lines = append(lines, prefix+line)
+		} else {
+			lines = append(lines, line)
+		}
+	}
+
+	return strings.Join(lines, "\n")
 }

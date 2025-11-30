@@ -8,14 +8,15 @@ package dnp3
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/google/gopacket"
 )
 
-type DNP3 struct {
-	DataLink    DataLink
-	Transport   Transport
-	Application Application
+type Frame struct {
+	DataLink    DataLink    `json:"data_link"`
+	Transport   Transport   `json:"transport"`
+	Application Application `json:"application"`
 }
 
 // DNP3Type (required by gopacket).
@@ -27,51 +28,51 @@ var LayerTypeDNP3 = gopacket.RegisterLayerType(20000,
 )
 
 // DNP3Layer type (required by gopacket).
-func (*DNP3) LayerType() gopacket.LayerType {
+func (*Frame) LayerType() gopacket.LayerType {
 	return LayerTypeDNP3
 }
 
 // All DNP3 layer bytes (required by gopacket).
-func (dnp *DNP3) LayerContents() []byte {
-	b, err := dnp.ToBytes()
+func (dnp *Frame) LayerContents() []byte {
+	encodedPacket, err := dnp.ToBytes()
 	if err != nil {
 		fmt.Printf("error encoding DNP3: %v\n", err)
 
 		return nil
 	}
 
-	return b
+	return encodedPacket
 }
 
 // DNP3 application object bytes (required by gopacket).
-func (dnp *DNP3) LayerPayload() []byte {
-	b, err := dnp.Application.ToBytes()
+func (dnp *Frame) LayerPayload() []byte {
+	applicationPayload, err := dnp.Application.ToBytes()
 	if err != nil {
 		fmt.Printf("error encoding DNP3 application: %v\n", err)
 
 		return nil
 	}
 
-	return b
+	return applicationPayload
 }
 
 // helper to bridge gopacket and FromBytes.
-func decodeDNP3(data []byte, p gopacket.PacketBuilder) error {
-	var d DNP3
+func decodeDNP3(data []byte, builder gopacket.PacketBuilder) error {
+	var decoded Frame
 
-	err := d.FromBytes(data)
+	err := decoded.FromBytes(data)
 	if err != nil {
 		return fmt.Errorf("decoding DNP3 from bytes: %w", err)
 	}
 
-	p.AddLayer(&d)
+	builder.AddLayer(&decoded)
 
 	return nil
 }
 
 // FromBytes creates a DNP3 object with appropriate layers based on the
 // bytes slice passed to it. Needs at least 10 bytes.
-func (dnp *DNP3) FromBytes(data []byte) error {
+func (dnp *Frame) FromBytes(data []byte) error {
 	var (
 		err   error
 		clean []byte
@@ -103,7 +104,7 @@ func (dnp *DNP3) FromBytes(data []byte) error {
 		return nil
 	}
 
-	if dnp.DataLink.CTL.DIR {
+	if dnp.DataLink.Control.Direction {
 		dnp.Application = &ApplicationRequest{}
 	} else {
 		dnp.Application = &ApplicationResponse{}
@@ -120,32 +121,56 @@ func (dnp *DNP3) FromBytes(data []byte) error {
 // ToBytes assembles the DNP3 packet as bytes, in order. It also performs some
 // updates to ensure the SYN, LEN, and CRCs are set correctly based on the
 // current data.
-func (dnp *DNP3) ToBytes() ([]byte, error) {
-	var ta []byte
+func (dnp *Frame) ToBytes() ([]byte, error) {
+	var transportApplication []byte
 
 	// get these first, for LEN in DL
-	ta = append(ta, dnp.Transport.ToByte())
+	transportByte, err := dnp.Transport.ToByte()
+	if err != nil {
+		return nil, fmt.Errorf("error encoding transport header: %w", err)
+	}
+
+	transportApplication = append(transportApplication, transportByte)
 	// Application isn't always set
 	if dnp.Application != nil {
-		b, err := dnp.Application.ToBytes()
+		applicationBytes, err := dnp.Application.ToBytes()
 		if err != nil {
-			return ta, fmt.Errorf("error encoding application data: %w", err)
+			return transportApplication, fmt.Errorf("error encoding application data: %w", err)
 		}
 
-		ta = append(ta, b...)
+		transportApplication = append(transportApplication, applicationBytes...)
 	}
 	// len is 5 more bytes in DL, excludes CRCs
-	dnp.DataLink.LEN = uint16(len(ta) + 5)
 
-	ta = InsertDNP3CRCs(ta)
+	payloadLength := len(transportApplication)
+	totalLength := payloadLength + 5
 
-	return append(dnp.DataLink.ToBytes(), ta...), nil
+	if totalLength > math.MaxUint16 {
+		return nil, fmt.Errorf("transport/application payload too large: %d bytes", payloadLength)
+	}
+
+	// #nosec G115 -- guarded by range check above
+	dnp.DataLink.Length = uint16(totalLength)
+
+	transportApplication = InsertDNP3CRCs(transportApplication)
+
+	dlBytes, err := dnp.DataLink.ToBytes()
+	if err != nil {
+		return nil, fmt.Errorf("error encoding data link: %w", err)
+	}
+
+	return append(dlBytes, transportApplication...), nil
 }
 
 // String outputs the DNP3 packet as an indented string.
-func (dnp *DNP3) String() string {
-	return fmt.Sprintf("DNP3:%s%s%s",
-		dnp.DataLink.String(),
-		dnp.Transport.String(),
-		dnp.Application.String())
+func (dnp *Frame) String() string {
+	appString := ""
+	if dnp.Application != nil {
+		appString = indent(dnp.Application.String(), "\t")
+	}
+
+	return fmt.Sprintf("DNP3:\n%s\n%s\n%s",
+		indent(dnp.DataLink.String(), "\t"),
+		indent(dnp.Transport.String(), "\t"),
+		appString)
 }
