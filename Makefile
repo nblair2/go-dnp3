@@ -7,12 +7,12 @@ setup:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/tools/cmd/stringer@latest
 
-generate: .generated-stamp
+generate: .generated-canary
 
-.generated-stamp: $(wildcard *.go)
-	GOPATH=$(shell go env GOPATH)
+.generated-canary: $(wildcard *.go)
+	@GOPATH=$(shell go env GOPATH)
 	go generate ./...
-	touch $@
+	@touch $@
 
 fix: generate
 	golangci-lint run ./... --fix
@@ -24,5 +24,4 @@ test: generate
 	go test ./dnp3 -v -args -pcaps=opendnp3_test1.pcap
 
 clean:
-	rm -f dnp3/*_string.go
-	rm -f .generated-stamp
+	rm -f *_string.go .generated-canary

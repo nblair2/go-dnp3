@@ -9,12 +9,12 @@ import (
 // DataLink is the highest layer of DNP3. Each DNP3 frame starts with a
 // data link header (8 bytes, 2 byte CRC).
 type DataLink struct {
-	SYN [2]byte
-	LEN uint16
-	CTL DataLinkCTL
-	DST uint16
-	SRC uint16
-	CRC [2]byte
+	Synchronize [2]byte         `json:"synchronize"`
+	Length      uint16          `json:"length"`
+	Control     DataLinkControl `json:"control"`
+	Destination uint16          `json:"destination"`
+	Source      uint16          `json:"source"`
+	Checksum    [2]byte         `json:"checksum"`
 }
 
 func (dl *DataLink) FromBytes(data []byte) error {
@@ -29,12 +29,12 @@ func (dl *DataLink) FromBytes(data []byte) error {
 			"data link checksum %#X doesn't match CRC (%#X)", crc, data[8:10])
 	}
 
-	dl.SYN = [2]byte{0x05, 0x64}
-	dl.LEN = uint16(data[2])
-	dl.CTL.FromByte(data[3])
-	dl.DST = binary.LittleEndian.Uint16(data[4:6])
-	dl.SRC = binary.LittleEndian.Uint16(data[6:8])
-	dl.CRC = [2]byte{data[8], data[9]}
+	dl.Synchronize = [2]byte{0x05, 0x64}
+	dl.Length = uint16(data[2])
+	dl.Control.FromByte(data[3])
+	dl.Destination = binary.LittleEndian.Uint16(data[4:6])
+	dl.Source = binary.LittleEndian.Uint16(data[6:8])
+	dl.Checksum = [2]byte{data[8], data[9]}
 
 	return nil
 }
@@ -43,21 +43,21 @@ func (dl *DataLink) ToBytes() ([]byte, error) {
 	var out []byte
 
 	// Set SYN bytes (in case we initialized an empty packet)
-	dl.SYN = [2]byte{0x05, 0x64}
+	dl.Synchronize = [2]byte{0x05, 0x64}
 
 	// LEN needs to be updated externally
-	if dl.LEN > 255 {
-		return nil, fmt.Errorf("length %d exceeds max byte value", dl.LEN)
+	if dl.Length > 255 {
+		return nil, fmt.Errorf("length %d exceeds max byte value", dl.Length)
 	}
 
-	out = append(out, dl.SYN[:]...)
-	out = append(out, byte(dl.LEN))
-	out = append(out, dl.CTL.ToByte())
-	out = binary.LittleEndian.AppendUint16(out, dl.DST)
-	out = binary.LittleEndian.AppendUint16(out, dl.SRC)
+	out = append(out, dl.Synchronize[:]...)
+	out = append(out, byte(dl.Length))
+	out = append(out, dl.Control.ToByte())
+	out = binary.LittleEndian.AppendUint16(out, dl.Destination)
+	out = binary.LittleEndian.AppendUint16(out, dl.Source)
 
-	dl.CRC = [2]byte(CalculateDNP3CRC(out))
-	out = append(out, dl.CRC[:]...)
+	dl.Checksum = [2]byte(CalculateDNP3CRC(out))
+	out = append(out, dl.Checksum[:]...)
 
 	return out, nil
 }
@@ -69,82 +69,90 @@ func (dl *DataLink) String() string {
 	%s
 	DST: %d
 	SRC: %d`,
-		dl.SYN, dl.LEN, indent(dl.CTL.String(), "\t"), dl.DST, dl.SRC)
+		dl.Synchronize, dl.Length, indent(dl.Control.String(), "\t"), dl.Destination, dl.Source)
 }
 
 // DataLinkControl is the 4th byte of the data link header.
-type DataLinkCTL struct {
-	DIR bool
-	PRM bool
-	FCB bool              // ignoring checks to enforce dl to 0
-	FCV bool              // ignoring use of DFC
-	FC  DataLinkPrimaryFC // only 4 bits
+type DataLinkControl struct {
+	Direction       bool                        `json:"direction"`
+	Primary         bool                        `json:"primary"`
+	FrameCountBit   bool                        `json:"frame_count_bit"`   // ignoring checks to enforce dl to 0
+	FrameCountValid bool                        `json:"frame_count_valid"` // ignoring use of DFC
+	FunctionCode    DataLinkPrimaryFunctionCode `json:"function_code"`     // only 4 bits
 }
 
-func (dlctl *DataLinkCTL) FromByte(value byte) {
-	dlctl.DIR = (value & 0b10000000) != 0
-	dlctl.PRM = (value & 0b01000000) != 0
-	dlctl.FCB = (value & 0b00100000) != 0
-	dlctl.FCV = (value & 0b00010000) != 0
-	dlctl.FC = DataLinkPrimaryFC(value & 0b00001111)
+func (dlctl *DataLinkControl) FromByte(value byte) {
+	dlctl.Direction = (value & 0b10000000) != 0
+	dlctl.Primary = (value & 0b01000000) != 0
+	dlctl.FrameCountBit = (value & 0b00100000) != 0
+	dlctl.FrameCountValid = (value & 0b00010000) != 0
+	dlctl.FunctionCode = DataLinkPrimaryFunctionCode(value & 0b00001111)
 }
 
-func (dlctl *DataLinkCTL) ToByte() byte {
+func (dlctl *DataLinkControl) ToByte() byte {
 	var controlByte byte
 
-	if dlctl.DIR {
+	if dlctl.Direction {
 		controlByte |= 0b10000000
 	}
 
-	if dlctl.PRM {
+	if dlctl.Primary {
 		controlByte |= 0b01000000
 	}
 
-	if dlctl.FCB {
+	if dlctl.FrameCountBit {
 		controlByte |= 0b00100000
 	}
 
-	if dlctl.FCV {
+	if dlctl.FrameCountValid {
 		controlByte |= 0b00010000
 	}
 
-	controlByte |= (uint8(dlctl.FC) & 0b00001111)
+	controlByte |= (uint8(dlctl.FunctionCode) & 0b00001111)
 
 	return controlByte
 }
 
-func (dlctl *DataLinkCTL) String() string {
-	return fmt.Sprintf(`CTL:
+func (dlctl *DataLinkControl) String() string {
+	return fmt.Sprintf(
+		`CTL:
 	DIR: %t
 	PRM: %t
 	FCB: %t
 	FCV: %t
 	FC : (%d) %s`,
-		dlctl.DIR, dlctl.PRM, dlctl.FCB, dlctl.FCV, dlctl.FC,
-		dlctl.FC.String())
+		dlctl.Direction,
+		dlctl.Primary,
+		dlctl.FrameCountBit,
+		dlctl.FrameCountValid,
+		dlctl.FunctionCode,
+		dlctl.FunctionCode.String(),
+	)
 }
 
-// Function Codes (PRM set).
+// DataLinkPrimaryFunctionCode - Function Codes for master to outsation
+// (PRM set).
 //
-//go:generate stringer -type=DataLinkPrimaryFC
-type DataLinkPrimaryFC uint8
+//go:generate stringer -type=DataLinkPrimaryFunctionCode
+type DataLinkPrimaryFunctionCode uint8
 
 const (
-	ResetLinkStates     DataLinkPrimaryFC = 0x0 // FCV 0
-	TestLinkStates      DataLinkPrimaryFC = 0x2 //     1
-	ConfirmedUserData   DataLinkPrimaryFC = 0x3 //     1
-	UnconfirmedUserData DataLinkPrimaryFC = 0x4 //     0
-	RequestLinkStatus   DataLinkPrimaryFC = 0x9 //     0
+	ResetLinkStates     DataLinkPrimaryFunctionCode = 0x0 // FCV 0
+	TestLinkStates      DataLinkPrimaryFunctionCode = 0x2 //     1
+	ConfirmedUserData   DataLinkPrimaryFunctionCode = 0x3 //     1
+	UnconfirmedUserData DataLinkPrimaryFunctionCode = 0x4 //     0
+	RequestLinkStatus   DataLinkPrimaryFunctionCode = 0x9 //     0
 )
 
-// Function Codes (PRM unset).
+// DataLinkSecondaryFunctionCode - Function Codes for outstation to master
+// (PRM unset).
 //
-//go:generate stringer -type=DataLinkSecondaryFC
-type DataLinkSecondaryFC uint8
+//go:generate stringer -type=DataLinkSecondaryFunctionCode
+type DataLinkSecondaryFunctionCode uint8
 
 const (
-	Ack          DataLinkSecondaryFC = 0x0
-	Nack         DataLinkSecondaryFC = 0x1
-	LinkStatus   DataLinkSecondaryFC = 0xb
-	NotSupported DataLinkSecondaryFC = 0xf
+	Ack          DataLinkSecondaryFunctionCode = 0x0
+	Nack         DataLinkSecondaryFunctionCode = 0x1
+	LinkStatus   DataLinkSecondaryFunctionCode = 0xb
+	NotSupported DataLinkSecondaryFunctionCode = 0xf
 )

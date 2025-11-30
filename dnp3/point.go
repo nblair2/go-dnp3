@@ -17,7 +17,7 @@ type PointsConstructor func([]byte, int, int) ([]Point, int, error)
 type PointsPacker func([]Point) ([]byte, error)
 
 type Point1Bit struct {
-	Value bool
+	Value bool `json:"value"`
 }
 
 // should not be used directly.
@@ -93,9 +93,9 @@ func packerPoints1Bit(points []Point) ([]byte, error) {
 }
 
 type Point1BitFlags struct {
-	Prefix []byte
-	Value  bool
-	Flags  PointFlags
+	Prefix []byte     `json:"prefix,omitempty"`
+	Value  bool       `json:"value"`
+	Flags  PointFlags `json:"flags"`
 }
 
 func (p *Point1BitFlags) FromBytes(data []byte, prefSize int) error {
@@ -164,7 +164,7 @@ func newPoints1BitFlags(data []byte, num, prefSize int) ([]Point, int, error) {
 }
 
 type Point2Bits struct {
-	Value [2]bool
+	Value [2]bool `json:"value"`
 }
 
 // should not be used directly.
@@ -267,8 +267,8 @@ func packerPoints2Bits(points []Point) ([]byte, error) {
 }
 
 type PointNBytes struct {
-	Prefix []byte
-	Value  []byte
+	Prefix []byte `json:"prefix,omitempty"`
+	Value  []byte `json:"value"`
 }
 
 func (p *PointNBytes) FromBytes(data []byte, prefSize int) error {
@@ -299,9 +299,9 @@ func newPointNBytes() *PointNBytes {
 }
 
 type PointNBytesFlags struct {
-	Prefix []byte
-	Value  []byte
-	Flags  PointFlags
+	Prefix []byte     `json:"prefix,omitempty"`
+	Value  []byte     `json:"value"`
+	Flags  PointFlags `json:"flags"`
 }
 
 func (p *PointNBytesFlags) FromBytes(data []byte, prefSize int) error {
@@ -349,10 +349,10 @@ func newPointNBytesFlags() *PointNBytesFlags {
 }
 
 type PointNBytesFlagsAbsTime struct {
-	Prefix  []byte
-	Value   []byte
-	Flags   PointFlags
-	AbsTime time.Time
+	Prefix       []byte     `json:"prefix,omitempty"`
+	Value        []byte     `json:"value"`
+	Flags        PointFlags `json:"flags"`
+	AbsoluteTime time.Time  `json:"absolute_time"`
 }
 
 func (p *PointNBytesFlagsAbsTime) FromBytes(data []byte, prefSize int) error {
@@ -369,12 +369,12 @@ func (p *PointNBytesFlagsAbsTime) FromBytes(data []byte, prefSize int) error {
 		return fmt.Errorf("couldn't decode flags byte: 0x % X, err: %w", data[prefSize], err)
 	}
 
-	absTime, err := bytesToDNP3TimeAbsolute(data[prefSize+1 : prefSize+7])
+	absTime, err := BytesToDNP3TimeAbsolute(data[prefSize+1 : prefSize+7])
 	if err != nil {
 		return fmt.Errorf("couldn't decode absolute timestamp: %w", err)
 	}
 
-	p.AbsTime = absTime
+	p.AbsoluteTime = absTime
 	p.Value = data[prefSize+7:]
 
 	return nil
@@ -386,7 +386,7 @@ func (p *PointNBytesFlagsAbsTime) ToBytes() ([]byte, error) {
 	output = append(output, p.Prefix...)
 	output = append(output, p.Flags.ToByte())
 
-	timeBytes, err := dnp3TimeAbsoluteToBytes(p.AbsTime)
+	timeBytes, err := DNP3TimeAbsoluteToBytes(p.AbsoluteTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode timestamp: %w", err)
 	}
@@ -405,7 +405,7 @@ func (p *PointNBytesFlagsAbsTime) String() string {
 
 	output += fmt.Sprintf("Value: 0x % X\n", p.Value)
 	output += p.Flags.String()
-	output += fmt.Sprintf("\nTimestamp: %s", p.AbsTime.UTC())
+	output += fmt.Sprintf("\nTimestamp: %s", p.AbsoluteTime.UTC())
 
 	return output
 }
@@ -415,9 +415,9 @@ func newPointNBytesFlagsAbsTime() *PointNBytesFlagsAbsTime {
 }
 
 type PointNBytesAbsTime struct {
-	Prefix  []byte
-	Value   []byte
-	AbsTime time.Time
+	Prefix       []byte    `json:"prefix,omitempty"`
+	Value        []byte    `json:"value"`
+	AbsoluteTime time.Time `json:"absolute_time"`
 }
 
 func (p *PointNBytesAbsTime) FromBytes(data []byte, prefSize int) error {
@@ -431,12 +431,12 @@ func (p *PointNBytesAbsTime) FromBytes(data []byte, prefSize int) error {
 
 	p.Value = data[prefSize : len(data)-6]
 
-	absTime, err := bytesToDNP3TimeAbsolute(data[len(data)-6:])
+	absTime, err := BytesToDNP3TimeAbsolute(data[len(data)-6:])
 	if err != nil {
 		return fmt.Errorf("couldn't decode absolute timestamp: %w", err)
 	}
 
-	p.AbsTime = absTime
+	p.AbsoluteTime = absTime
 
 	return nil
 }
@@ -447,7 +447,7 @@ func (p *PointNBytesAbsTime) ToBytes() ([]byte, error) {
 	output = append(output, p.Prefix...)
 	output = append(output, p.Value...)
 
-	timeBytes, err := dnp3TimeAbsoluteToBytes(p.AbsTime)
+	timeBytes, err := DNP3TimeAbsoluteToBytes(p.AbsoluteTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode timestamp: %w", err)
 	}
@@ -462,7 +462,7 @@ func (p *PointNBytesAbsTime) String() string {
 	}
 
 	output += fmt.Sprintf("Value: 0x % X", p.Value)
-	output += fmt.Sprintf("\nTimestamp: %s", p.AbsTime.UTC())
+	output += fmt.Sprintf("\nTimestamp: %s", p.AbsoluteTime.UTC())
 
 	return output
 }
@@ -472,9 +472,9 @@ func newPointNBytesAbsTime() *PointNBytesAbsTime {
 }
 
 type PointNBytesRelTime struct {
-	Prefix  []byte
-	Value   []byte
-	RelTime RelativeTime
+	Prefix       []byte       `json:"prefix,omitempty"`
+	Value        []byte       `json:"value"`
+	RelativeTime RelativeTime `json:"relative_time"`
 }
 
 func (p *PointNBytesRelTime) FromBytes(data []byte, prefSize int) error {
@@ -488,12 +488,12 @@ func (p *PointNBytesRelTime) FromBytes(data []byte, prefSize int) error {
 
 	p.Value = data[prefSize : len(data)-2]
 
-	relativeTime, err := bytesToDNP3TimeRelative(data[len(data)-2:])
+	relativeTime, err := BytesToDNP3TimeRelative(data[len(data)-2:])
 	if err != nil {
 		return fmt.Errorf("couldn't decode relative timestamp: %w", err)
 	}
 
-	p.RelTime = relativeTime
+	p.RelativeTime = relativeTime
 
 	return nil
 }
@@ -504,7 +504,7 @@ func (p *PointNBytesRelTime) ToBytes() ([]byte, error) {
 	output = append(output, p.Prefix...)
 	output = append(output, p.Value...)
 
-	timeBytes, err := dnp3TimeRelativeToBytes(p.RelTime)
+	timeBytes, err := DNP3TimeRelativeToBytes(p.RelativeTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode relative timestamp: %w", err)
 	}
@@ -519,7 +519,7 @@ func (p *PointNBytesRelTime) String() string {
 	}
 
 	output += fmt.Sprintf("Value: 0x % X", p.Value)
-	output += fmt.Sprintf("\nTimestamp offset: %s", p.RelTime)
+	output += fmt.Sprintf("\nTimestamp offset: %s", p.RelativeTime)
 
 	return output
 }
@@ -529,8 +529,8 @@ func newPointNBytesRelTime() *PointNBytesRelTime {
 }
 
 type PointAbsTime struct {
-	Prefix  []byte
-	AbsTime time.Time
+	Prefix       []byte    `json:"prefix,omitempty"`
+	AbsoluteTime time.Time `json:"absolute_time"`
 }
 
 func (p *PointAbsTime) FromBytes(data []byte, prefSize int) error {
@@ -542,18 +542,18 @@ func (p *PointAbsTime) FromBytes(data []byte, prefSize int) error {
 		p.Prefix = data[0:prefSize]
 	}
 
-	absTime, err := bytesToDNP3TimeAbsolute(data[0:6])
+	absTime, err := BytesToDNP3TimeAbsolute(data[0:6])
 	if err != nil {
 		return fmt.Errorf("couldn't decode absolute timestamp: %w", err)
 	}
 
-	p.AbsTime = absTime
+	p.AbsoluteTime = absTime
 
 	return nil
 }
 
 func (p *PointAbsTime) ToBytes() ([]byte, error) {
-	timeBytes, err := dnp3TimeAbsoluteToBytes(p.AbsTime)
+	timeBytes, err := DNP3TimeAbsoluteToBytes(p.AbsoluteTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode timestamp: %w", err)
 	}
@@ -567,7 +567,7 @@ func (p *PointAbsTime) String() string {
 		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
 	}
 
-	return output + fmt.Sprintf("Timestamp: %s", p.AbsTime.UTC())
+	return output + fmt.Sprintf("Timestamp: %s", p.AbsoluteTime.UTC())
 }
 
 func newPointAbsTime() *PointAbsTime {
@@ -575,8 +575,8 @@ func newPointAbsTime() *PointAbsTime {
 }
 
 type PointRelTime struct {
-	Prefix  []byte
-	RelTime RelativeTime
+	Prefix       []byte       `json:"prefix,omitempty"`
+	RelativeTime RelativeTime `json:"relative_time"`
 }
 
 func (p *PointRelTime) FromBytes(data []byte, prefSize int) error {
@@ -588,18 +588,18 @@ func (p *PointRelTime) FromBytes(data []byte, prefSize int) error {
 		p.Prefix = data[0:prefSize]
 	}
 
-	relativeTime, err := bytesToDNP3TimeRelative(data[prefSize : prefSize+2])
+	relativeTime, err := BytesToDNP3TimeRelative(data[prefSize : prefSize+2])
 	if err != nil {
 		return fmt.Errorf("couldn't decode relative timestamp: %w", err)
 	}
 
-	p.RelTime = relativeTime
+	p.RelativeTime = relativeTime
 
 	return nil
 }
 
 func (p *PointRelTime) ToBytes() ([]byte, error) {
-	timeBytes, err := dnp3TimeRelativeToBytes(p.RelTime)
+	timeBytes, err := DNP3TimeRelativeToBytes(p.RelativeTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode relative timestamp: %w", err)
 	}
@@ -613,7 +613,7 @@ func (p *PointRelTime) String() string {
 		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
 	}
 
-	return output + fmt.Sprintf("Timestamp offset: %s", p.RelTime)
+	return output + fmt.Sprintf("Timestamp offset: %s", p.RelativeTime)
 }
 
 func newPointRelTime() *PointRelTime {
@@ -696,15 +696,15 @@ func packNoPoints(points []Point) ([]byte, error) {
 }
 
 type PointFlags struct {
-	Reserved       bool // should be 0
-	PointValue     bool
-	ReferenceCheck bool
-	OverRange      bool
-	LocalForce     bool
-	RemoteForce    bool
-	CommFail       bool
-	Restart        bool
-	Online         bool
+	Reserved       bool `json:"reserved"` // should be 0
+	PointValue     bool `json:"point_value"`
+	ReferenceCheck bool `json:"reference_check"`
+	OverRange      bool `json:"over_range"`
+	LocalForce     bool `json:"local_force"`
+	RemoteForce    bool `json:"remote_force"`
+	CommFail       bool `json:"comm_fail"`
+	Restart        bool `json:"restart"`
+	Online         bool `json:"online"`
 }
 
 func (f *PointFlags) FromByte(data byte) error {

@@ -4,17 +4,17 @@ import (
 	"fmt"
 )
 
-// DNP3 ApplicationRequest are sent from the master to the outstation.
+// ApplicationRequest - sent from the master to the outstation.
 type ApplicationRequest struct {
-	CTL  ApplicationCTL
-	FC   RequestFC
-	Data ApplicationData
+	Control      ApplicationControl  `json:"control"`
+	FunctionCode RequestFunctionCode `json:"function_code"`
+	Data         ApplicationData     `json:"data"`
 }
 
 func (appreq *ApplicationRequest) FromBytes(data []byte) error {
-	appreq.CTL.FromByte(data[0])
+	appreq.Control.FromByte(data[0])
 
-	appreq.FC = RequestFC(data[1])
+	appreq.FunctionCode = RequestFunctionCode(data[1])
 
 	err := appreq.Data.FromBytes(data[2:])
 	if err != nil {
@@ -27,13 +27,13 @@ func (appreq *ApplicationRequest) FromBytes(data []byte) error {
 func (appreq *ApplicationRequest) ToBytes() ([]byte, error) {
 	var encoded []byte
 
-	ctlByte, err := appreq.CTL.ToByte()
+	ctlByte, err := appreq.Control.ToByte()
 	if err != nil {
 		return encoded, fmt.Errorf("error encoding application control: %w", err)
 	}
 
 	encoded = append(encoded, ctlByte)
-	encoded = append(encoded, byte(appreq.FC))
+	encoded = append(encoded, byte(appreq.FunctionCode))
 
 	dataBytes, err := appreq.Data.ToBytes()
 	if err != nil {
@@ -47,7 +47,7 @@ func (appreq *ApplicationRequest) ToBytes() ([]byte, error) {
 
 func (appreq *ApplicationRequest) String() string {
 	requestString := fmt.Sprintf("Application (Request):\n%s\n\tFC : (%d) %s",
-		indent(appreq.CTL.String(), "\t"), appreq.FC, appreq.FC.String())
+		indent(appreq.Control.String(), "\t"), appreq.FunctionCode, appreq.FunctionCode.String())
 
 	dataString := appreq.Data.String()
 	if dataString != "" {
@@ -57,16 +57,16 @@ func (appreq *ApplicationRequest) String() string {
 	return requestString
 }
 
-func (appreq *ApplicationRequest) GetCTL() ApplicationCTL {
-	return appreq.CTL
+func (appreq *ApplicationRequest) GetControl() ApplicationControl {
+	return appreq.Control
 }
 
-func (appreq *ApplicationRequest) SetCTL(ctl ApplicationCTL) {
-	appreq.CTL = ctl
+func (appreq *ApplicationRequest) SetControl(ctl ApplicationControl) {
+	appreq.Control = ctl
 }
 
 func (appreq *ApplicationRequest) GetSequence() uint8 {
-	return appreq.CTL.SEQ
+	return appreq.Control.Sequence
 }
 
 func (appreq *ApplicationRequest) SetSequence(s uint8) error {
@@ -74,17 +74,17 @@ func (appreq *ApplicationRequest) SetSequence(s uint8) error {
 		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
 	}
 
-	appreq.CTL.SEQ = s
+	appreq.Control.Sequence = s
 
 	return nil
 }
 
 func (appreq *ApplicationRequest) GetFunctionCode() byte {
-	return byte(appreq.FC)
+	return byte(appreq.FunctionCode)
 }
 
 func (appreq *ApplicationRequest) SetFunctionCode(code byte) {
-	appreq.FC = RequestFC(code)
+	appreq.FunctionCode = RequestFunctionCode(code)
 }
 
 func (appreq *ApplicationRequest) GetData() ApplicationData {
@@ -95,14 +95,14 @@ func (appreq *ApplicationRequest) SetData(payload ApplicationData) {
 	appreq.Data = payload
 }
 
-// DNP3 Application RequestFC specify the action the master is directing the
+// RequestFunctionCode - specify the action the master is directing the
 // outstation to take.
 //
-//go:generate stringer -type=RequestFC
-type RequestFC byte
+//go:generate stringer -type=RequestFunctionCode
+type RequestFunctionCode byte
 
 const (
-	Confirm RequestFC = iota // 0x0
+	Confirm RequestFunctionCode = iota // 0x0
 	Read
 	Write
 	Select

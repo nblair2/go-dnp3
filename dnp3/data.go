@@ -9,14 +9,14 @@ import (
 
 // ApplicationData holds an array of Data objects.
 type ApplicationData struct {
-	OBJS []DataObject
+	Objects []DataObject `json:"objects"`
 	// in case we get in to trouble unrolling the objects just store the rest
 	// of the data in here. Or can use this to set all data like "raw"
 	extra []byte
 }
 
 func (ad *ApplicationData) FromBytes(data []byte) error {
-	ad.OBJS = nil // in case there was already stuff here
+	ad.Objects = nil // in case there was already stuff here
 
 	for readOffset := 0; readOffset < len(data); {
 		var object DataObject
@@ -29,7 +29,7 @@ func (ad *ApplicationData) FromBytes(data []byte) error {
 				data[readOffset:], err)
 		}
 
-		ad.OBJS = append(ad.OBJS, object)
+		ad.Objects = append(ad.Objects, object)
 		readOffset += object.SizeOf()
 	}
 
@@ -39,7 +39,7 @@ func (ad *ApplicationData) FromBytes(data []byte) error {
 func (ad *ApplicationData) ToBytes() ([]byte, error) {
 	var encoded []byte
 
-	for _, object := range ad.OBJS {
+	for _, object := range ad.Objects {
 		bytesOut, err := object.ToBytes()
 		if err != nil {
 			return encoded, fmt.Errorf("could not encode object: %w", err)
@@ -58,11 +58,11 @@ func (ad *ApplicationData) String() string {
 	header := "Data Objects:"
 	headerAdded := false
 
-	if len(ad.OBJS) > 0 {
+	if len(ad.Objects) > 0 {
 		output += header
 		headerAdded = true
 
-		for _, obj := range ad.OBJS {
+		for _, obj := range ad.Objects {
 			output += "\n" + indent("- "+obj.String(), "\t")
 		}
 	}
@@ -83,9 +83,9 @@ func (ad *ApplicationData) HasExtra() bool {
 }
 
 type DataObject struct {
-	Header    ObjectHeader
-	Points    []Point
-	Extra     []byte
+	Header    ObjectHeader `json:"header"`
+	Points    []Point      `json:"points"`
+	Extra     []byte       `json:"extra,omitempty"`
 	totalSize int
 }
 
@@ -197,14 +197,14 @@ func (do *DataObject) SizeOf() int {
 // ObjectHeader is used to describe the structure of application data.
 type ObjectHeader struct {
 	// Object Type Field
-	Group      uint8
-	Variation  uint8
+	Group      uint8 `json:"group"`
+	Variation  uint8 `json:"variation"`
 	objectType *objectType
 	// Qualifier Field
-	Reserved        bool // Should always be set to 0
-	PointPrefixCode PointPrefixCode
-	RangeSpecCode   RangeSpecCode
-	RangeField      RangeField
+	Reserved        bool            `json:"reserved"` // Should always be set to 0
+	PointPrefixCode PointPrefixCode `json:"point_prefix_code"`
+	RangeSpecCode   RangeSpecCode   `json:"range_spec_code"`
+	RangeField      RangeField      `json:"range_field"`
 	size            int
 }
 
@@ -405,7 +405,7 @@ func (ppc PointPrefixCode) GetPointPrefixSize() int {
 	return 0
 }
 
-// RangeSpec describes how big and how the rangefield is formatted.
+// RangeSpecCode - describes rangefield is format and size.
 //
 //go:generate stringer -type=RangeSpecCode
 type RangeSpecCode uint8 // only 4 bits
@@ -439,8 +439,8 @@ type RangeField interface {
 
 // RangeField0 1 byte start and stop values.
 type RangeField0 struct {
-	Start uint8
-	Stop  uint8
+	Start uint8 `json:"start"`
+	Stop  uint8 `json:"stop"`
 }
 
 func (rf *RangeField0) ToBytes() ([]byte, error) {
@@ -472,8 +472,8 @@ func (rf *RangeField0) Size() int { return 2 }
 
 // RangeField1 2 byte start and stop values.
 type RangeField1 struct {
-	Start uint16
-	Stop  uint16
+	Start uint16 `json:"start"`
+	Stop  uint16 `json:"stop"`
 }
 
 func (rf *RangeField1) ToBytes() ([]byte, error) {
@@ -510,8 +510,8 @@ func (rf *RangeField1) Size() int { return 4 }
 
 // RangeField2 4 byte start and stop values.
 type RangeField2 struct {
-	Start uint32
-	Stop  uint32
+	Start uint32 `json:"start"`
+	Stop  uint32 `json:"stop"`
 }
 
 func (rf *RangeField2) ToBytes() ([]byte, error) {
@@ -548,8 +548,8 @@ func (rf *RangeField2) Size() int { return 8 }
 
 // RangeField3 1 byte VIRTUAL start and stop values.
 type RangeField3 struct {
-	Start uint8
-	Stop  uint8
+	Start uint8 `json:"start"`
+	Stop  uint8 `json:"stop"`
 }
 
 func (rf *RangeField3) ToBytes() ([]byte, error) {
@@ -581,8 +581,8 @@ func (rf *RangeField3) Size() int { return 2 }
 
 // RangeField4 2 byte VIRTUAL start and stop values.
 type RangeField4 struct {
-	Start uint16
-	Stop  uint16
+	Start uint16 `json:"start"`
+	Stop  uint16 `json:"stop"`
 }
 
 func (rf *RangeField4) ToBytes() ([]byte, error) {
@@ -619,8 +619,8 @@ func (rf *RangeField4) Size() int { return 4 }
 
 // RangeField5 4 byte VIRTUAL start and stop values.
 type RangeField5 struct {
-	Start uint32
-	Stop  uint32
+	Start uint32 `json:"start"`
+	Stop  uint32 `json:"stop"`
 }
 
 func (rf *RangeField5) ToBytes() ([]byte, error) {
@@ -678,7 +678,7 @@ func (rf *RangeField6) Size() int { return 0 }
 
 // RangeField7 1 byte count of objects.
 type RangeField7 struct {
-	Count uint8
+	Count uint8 `json:"count"`
 }
 
 func (rf *RangeField7) ToBytes() ([]byte, error) {
@@ -708,7 +708,7 @@ func (rf *RangeField7) Size() int { return 1 }
 
 // RangeField8 2 byte count of objects.
 type RangeField8 struct {
-	Count uint16
+	Count uint16 `json:"count"`
 }
 
 func (rf *RangeField8) ToBytes() ([]byte, error) {
@@ -742,7 +742,7 @@ func (rf *RangeField8) Size() int { return 2 }
 
 // RangeField9 4 byte count of objects.
 type RangeField9 struct {
-	Count uint32
+	Count uint32 `json:"count"`
 }
 
 func (rf *RangeField9) ToBytes() ([]byte, error) {
@@ -776,7 +776,7 @@ func (rf *RangeField9) Size() int { return 4 }
 
 // RangeFieldB 1 byte count of objects with variable format.
 type RangeFieldB struct {
-	Count uint8
+	Count uint8 `json:"count"`
 	// Variable ?
 }
 

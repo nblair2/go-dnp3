@@ -61,7 +61,7 @@ linters:
     - mirror
     - misspell
     # - mnd
-    # - musttag
+    - musttag
     - nakedret
     - nestif
     - nilerr
@@ -106,8 +106,15 @@ linters:
     - wrapcheck
     - wsl_v5
     - zerologlint
+  settings:
+    tagliatelle:
+      case:
+        rules:
+          json: snake
   exclusions:
     warn-unused: true
+    paths:
+      - example.go
     rules:
       # Never
       - linters:
@@ -137,7 +144,6 @@ linters:
     - mnd              # does not allow magic numbers which is everywhere in protocol parsing
     # Maybe one day
     - godoclint        # re-add eventually (revive comment/unexported too)
-    - musttag          # structs that are json marshaled must be annoted with tags
 
 formatters:
   enable:

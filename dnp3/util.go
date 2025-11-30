@@ -130,7 +130,7 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 	return crcs, clean, nil
 }
 
-func bytesToDNP3TimeAbsolute(data []byte) (time.Time, error) {
+func BytesToDNP3TimeAbsolute(data []byte) (time.Time, error) {
 	if len(data) < 6 {
 		return time.Time{}, fmt.Errorf("absolute time requires 6 bytes, got %d", len(data))
 	}
@@ -150,7 +150,7 @@ func bytesToDNP3TimeAbsolute(data []byte) (time.Time, error) {
 	return time.UnixMilli(int64(milliseconds)), nil
 }
 
-func dnp3TimeAbsoluteToBytes(value time.Time) ([]byte, error) {
+func DNP3TimeAbsoluteToBytes(value time.Time) ([]byte, error) {
 	milliseconds := value.UnixMilli()
 	if milliseconds < 0 {
 		return nil, fmt.Errorf("timestamp %v is negative", value)
@@ -167,7 +167,7 @@ func dnp3TimeAbsoluteToBytes(value time.Time) ([]byte, error) {
 	return encoded[:6], nil
 }
 
-func bytesToDNP3TimeRelative(data []byte) (RelativeTime, error) {
+func BytesToDNP3TimeRelative(data []byte) (RelativeTime, error) {
 	if len(data) < 2 {
 		return 0, fmt.Errorf("relative time requires 2 bytes, got %d", len(data))
 	}
@@ -177,7 +177,7 @@ func bytesToDNP3TimeRelative(data []byte) (RelativeTime, error) {
 	return RelativeTime(time.Duration(milliseconds) * time.Millisecond), nil
 }
 
-func dnp3TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
+func DNP3TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
 	relativeDuration := relativeTime.Duration()
 	milliseconds := int64(relativeDuration / time.Millisecond)
 

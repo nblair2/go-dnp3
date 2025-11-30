@@ -14,9 +14,9 @@ import (
 )
 
 type Frame struct {
-	DataLink    DataLink
-	Transport   Transport
-	Application Application
+	DataLink    DataLink    `json:"data_link"`
+	Transport   Transport   `json:"transport"`
+	Application Application `json:"application"`
 }
 
 // DNP3Type (required by gopacket).
@@ -104,7 +104,7 @@ func (dnp *Frame) FromBytes(data []byte) error {
 		return nil
 	}
 
-	if dnp.DataLink.CTL.DIR {
+	if dnp.DataLink.Control.Direction {
 		dnp.Application = &ApplicationRequest{}
 	} else {
 		dnp.Application = &ApplicationResponse{}
@@ -150,7 +150,7 @@ func (dnp *Frame) ToBytes() ([]byte, error) {
 	}
 
 	// #nosec G115 -- guarded by range check above
-	dnp.DataLink.LEN = uint16(totalLength)
+	dnp.DataLink.Length = uint16(totalLength)
 
 	transportApplication = InsertDNP3CRCs(transportApplication)
 

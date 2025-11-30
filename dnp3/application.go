@@ -4,14 +4,13 @@ import (
 	"fmt"
 )
 
-// DNP3 Application layer abstraction for different Request / Response
-// structure.
+// Application - layer abstraction for Request / Response structure.
 type Application interface {
 	FromBytes(data []byte) error
 	ToBytes() ([]byte, error)
 	String() string
-	GetCTL() ApplicationCTL
-	SetCTL(ctl ApplicationCTL)
+	GetControl() ApplicationControl
+	SetControl(ctl ApplicationControl)
 	GetSequence() uint8
 	SetSequence(seq uint8) error
 	GetFunctionCode() byte
@@ -20,58 +19,57 @@ type Application interface {
 	SetData(data ApplicationData)
 }
 
-// ApplicationCTL
-// a common header byte for both application types.
-type ApplicationCTL struct {
-	FIR bool
-	FIN bool
-	CON bool
-	UNS bool
-	SEQ uint8 // 4 bits
+// ApplicationControl - header byte for both application types.
+type ApplicationControl struct {
+	First       bool  `json:"first"`
+	Final       bool  `json:"final"`
+	Confirm     bool  `json:"confirm"`
+	Unsolicited bool  `json:"unsolicited"`
+	Sequence    uint8 `json:"sequence"` // 4 bits
 }
 
-func (appctl *ApplicationCTL) FromByte(value byte) {
-	appctl.FIR = (value & 0b10000000) != 0
-	appctl.FIN = (value & 0b01000000) != 0
-	appctl.CON = (value & 0b00100000) != 0
-	appctl.UNS = (value & 0b00010000) != 0
-	appctl.SEQ = (value & 0b00001111)
+func (appctl *ApplicationControl) FromByte(value byte) {
+	appctl.First = (value & 0b10000000) != 0
+	appctl.Final = (value & 0b01000000) != 0
+	appctl.Confirm = (value & 0b00100000) != 0
+	appctl.Unsolicited = (value & 0b00010000) != 0
+	appctl.Sequence = (value & 0b00001111)
 }
 
-func (appctl *ApplicationCTL) ToByte() (byte, error) {
+func (appctl *ApplicationControl) ToByte() (byte, error) {
 	var ctlByte byte
 
-	if appctl.FIR {
+	if appctl.First {
 		ctlByte |= 0b10000000
 	}
 
-	if appctl.FIN {
+	if appctl.Final {
 		ctlByte |= 0b01000000
 	}
 
-	if appctl.CON {
+	if appctl.Confirm {
 		ctlByte |= 0b00100000
 	}
 
-	if appctl.UNS {
+	if appctl.Unsolicited {
 		ctlByte |= 0b00010000
 	}
 
-	if appctl.SEQ > 15 {
-		return 0, fmt.Errorf("sequence number %d exceeds 4 bits", appctl.SEQ)
+	if appctl.Sequence > 15 {
+		return 0, fmt.Errorf("sequence number %d exceeds 4 bits", appctl.Sequence)
 	}
 
-	ctlByte |= (appctl.SEQ & 0b00001111)
+	ctlByte |= (appctl.Sequence & 0b00001111)
 
 	return ctlByte, nil
 }
 
-func (appctl *ApplicationCTL) String() string {
+func (appctl *ApplicationControl) String() string {
 	return fmt.Sprintf(`CTL:
 	FIR: %t
 	FIN: %t
 	CON: %t
 	UNS: %t
 	SEQ: %d`,
-		appctl.FIR, appctl.FIN, appctl.CON, appctl.UNS, appctl.SEQ)
+		appctl.First, appctl.Final, appctl.Confirm, appctl.Unsolicited, appctl.Sequence)
 }

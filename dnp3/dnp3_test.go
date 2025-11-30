@@ -18,7 +18,8 @@ import (
 var (
 	customPcapsFlag string
 	customPcaps     []string
-	printPacketFlag bool
+	printStringFlag bool
+	printJSONFlag   bool
 
 	tests = []struct {
 		name  string
@@ -102,7 +103,8 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.StringVar(&customPcapsFlag, "pcaps", "", "Comma-separated list of pcap files to read")
-	flag.BoolVar(&printPacketFlag, "print", false, "Print packet string output")
+	flag.BoolVar(&printStringFlag, "print-string", false, "Print packet string output")
+	flag.BoolVar(&printJSONFlag, "print-json", false, "Print packet json output")
 	flag.Parse()
 
 	if customPcapsFlag != "" {
@@ -194,13 +196,17 @@ func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
 	}
 
 	str := packet.String()
-	if printPacketFlag {
+	if printStringFlag {
 		fmt.Println(str)
 	}
 
-	_, err = json.MarshalIndent(packet, "", "  ")
+	jsonBytes, err := json.MarshalIndent(packet, "", "  ")
 	if err != nil {
 		t.Fatal("MarshalIndent:", err)
+	}
+
+	if printJSONFlag {
+		fmt.Println(string(jsonBytes))
 	}
 }
 
