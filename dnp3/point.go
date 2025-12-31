@@ -71,6 +71,7 @@ func newPoints1Bit(data []byte, num, prefSize int) ([]Point, int, error) {
 
 func packerPoints1Bit(points []Point) ([]byte, error) {
 	var packed []byte
+
 	for pointOffset := 0; pointOffset < len(points); pointOffset += 8 {
 		var packedByte byte
 
@@ -236,6 +237,7 @@ func newPoints2Bits(data []byte, num, prefSize int) ([]Point, int, error) {
 
 func packerPoints2Bits(points []Point) ([]byte, error) {
 	var packed []byte
+
 	for pointOffset := 0; pointOffset < len(points); pointOffset += 4 {
 		var packedByte byte
 
@@ -305,10 +307,6 @@ type PointNBytesFlags struct {
 }
 
 func (p *PointNBytesFlags) FromBytes(data []byte, prefSize int) error {
-	if len(data) != 2+prefSize {
-		return fmt.Errorf("need %d bytes, got %d", 2+prefSize, len(data))
-	}
-
 	if prefSize != 0 {
 		p.Prefix = data[0:prefSize]
 	}

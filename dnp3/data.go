@@ -62,9 +62,12 @@ func (ad *ApplicationData) String() string {
 		output += header
 		headerAdded = true
 
+		var stringBuilder strings.Builder
 		for _, obj := range ad.Objects {
-			output += "\n" + indent("- "+obj.String(), "\t")
+			stringBuilder.WriteString("\n" + indent("- "+obj.String(), "\t"))
 		}
+
+		output += stringBuilder.String()
 	}
 
 	if len(ad.extra) > 0 {
@@ -175,6 +178,8 @@ func (do *DataObject) String() string {
 
 	output += "\n  Objects:"
 
+	var stringBuilder strings.Builder
+
 	for _, point := range do.Points {
 		lines := strings.Split(point.String(), "\n")
 		if len(lines) > 0 {
@@ -183,9 +188,11 @@ func (do *DataObject) String() string {
 				lines[i] = "  " + lines[i]
 			}
 
-			output += "\n" + indent(strings.Join(lines, "\n"), "\t")
+			stringBuilder.WriteString("\n" + indent(strings.Join(lines, "\n"), "\t"))
 		}
 	}
+
+	output += stringBuilder.String()
 
 	return output
 }
