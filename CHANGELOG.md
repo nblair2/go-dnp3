@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/nblair2/go-dnp3/compare/v1.0.0...v1.0.1) (2025-12-31)
+
+
+### Bug Fixes
+
+* PointNBytesFlag, DataLinkControlFucntionCodes ([#10](https://github.com/nblair2/go-dnp3/issues/10)) ([ae7d1da](https://github.com/nblair2/go-dnp3/commit/ae7d1dad8e8a17b84f7fae8a804faba5d77f68ff))
+
 ## [1.0.0](https://github.com/nblair2/go-dnp3/compare/v0.1.2...v1.0.0) (2025-11-30)
 
 
