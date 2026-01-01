@@ -44,6 +44,6 @@ go test ./dnp3 -args -print
 ### Linting
 [`golangci-lint`](https://golangci-lint.run/) is used for lint and format checking. Run `make lint` to check for errors, and `make fix` to try to automatically fix linting or formatting errors.
 
-## Implemenation
+## Implementation
 
 Based on Wireshark's parser and publicly available documents (such as [this validation guide](https://www.dnp.org/Portals/0/Public%20Documents/DNP3%20AN2013-004b%20Validation%20of%20Incoming%20DNP3%20Data.pdf)), as access to the official DNP3 specification is restricted.
