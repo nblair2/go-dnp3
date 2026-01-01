@@ -10,8 +10,7 @@ permissions:
   issues: write
 
 jobs:
-  release:
-    name: Run release-please
+  release-please:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

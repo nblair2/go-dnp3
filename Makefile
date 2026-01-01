@@ -21,6 +21,11 @@ fix: generate
 lint: generate
 	golangci-lint run ./...
 
+spell:
+	codespell .
+
+check: lint spell
+
 test: generate
 	CGO_ENABLED=1 go test ./dnp3 -v -args -pcaps=opendnp3_test1.pcap
 

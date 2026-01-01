@@ -115,7 +115,7 @@ const (
 	AuthenticationResponse
 )
 
-// ApplicationInternalIndications - information about outstation sate.
+// ApplicationInternalIndications - information about outstation state.
 type ApplicationInternalIndications struct {
 	// IIN 1
 	AllStations   bool `json:"all_stations"`
