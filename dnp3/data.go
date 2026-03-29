@@ -90,6 +90,7 @@ type DataObject struct {
 	Points    []Point      `json:"points"`
 	Extra     []byte       `json:"extra,omitempty"`
 	totalSize int
+	indexes   []int
 }
 
 func (do *DataObject) FromBytes(data []byte) error {
@@ -114,16 +115,26 @@ func (do *DataObject) FromBytes(data []byte) error {
 		return nil
 	}
 
-	var sizeAllPoints int
+	var size int
 
-	do.Points, sizeAllPoints, err = do.Header.objectType.Constructor(
+	do.Points, size, err = do.Header.objectType.Constructor(
 		data[headSize:],
 		numPoints,
 		do.Header.PointPrefixCode.GetPointPrefixSize(),
+		do.Header.PointPrefixCode,
 	)
-	do.totalSize += sizeAllPoints
+	if err != nil {
+		return fmt.Errorf("can't create points: %w", err)
+	}
 
-	return err
+	do.totalSize += size
+
+	err = do.updateIndexes()
+	if err != nil {
+		return fmt.Errorf("failed to update indexes: %w", err)
+	}
+
+	return nil
 }
 
 func (do *DataObject) ToBytes() ([]byte, error) {
@@ -201,6 +212,95 @@ func (do *DataObject) SizeOf() int {
 	return do.totalSize
 }
 
+func (do *DataObject) Indexes() []int {
+	return do.indexes
+}
+
+//nolint:cyclop // straightforward switches
+func (do *DataObject) updateIndexes() error {
+	switch rangeField := do.Header.RangeField.(type) {
+	// If the RangeField has start and stop indexes, we can pull those (0 - 5)
+	case *RangeField0:
+		for i := rangeField.Start; i <= rangeField.Stop; i++ {
+			do.indexes = append(do.indexes, int(i))
+		}
+
+		return nil
+	case *RangeField1:
+		for i := rangeField.Start; i <= rangeField.Stop; i++ {
+			do.indexes = append(do.indexes, int(i))
+		}
+
+		return nil
+	case *RangeField2:
+		for i := rangeField.Start; i <= rangeField.Stop; i++ {
+			do.indexes = append(do.indexes, int(i))
+		}
+
+		return nil
+	case *RangeField3:
+		for i := rangeField.Start; i <= rangeField.Stop; i++ {
+			do.indexes = append(do.indexes, int(i))
+		}
+
+		return nil
+	case *RangeField4:
+		for i := rangeField.Start; i <= rangeField.Stop; i++ {
+			do.indexes = append(do.indexes, int(i))
+		}
+
+		return nil
+	case *RangeField5:
+		for i := rangeField.Start; i <= rangeField.Stop; i++ {
+			do.indexes = append(do.indexes, int(i))
+		}
+
+		return nil
+	// TODO - assumption
+	// If the RangeField is all, we expect the points start at 0
+	case *RangeField6:
+		for i := range len(do.Points) {
+			do.indexes = append(do.indexes, i)
+		}
+
+		return nil
+	// If the RangeField is count-based, we need to pull the indexes from the points themselves
+	case *RangeField7, *RangeField8, *RangeField9, *RangeFieldB:
+		return do.updateIndexesFromPrefix()
+	default:
+		return fmt.Errorf("unexpected range field type %T", do.Header.RangeField)
+	}
+}
+
+// updateIndexesFromPrefix resolves point indexes for count-based range
+// fields by inspecting the object header's PointPrefixCode.
+func (do *DataObject) updateIndexesFromPrefix() error {
+	switch do.Header.PointPrefixCode {
+	case OctetIndex1, OctetIndex2, OctetIndex4:
+		for _, point := range do.Points {
+			index, err := point.GetIndex()
+			if err != nil {
+				return fmt.Errorf("failed to get index from point: %w", err)
+			}
+
+			do.indexes = append(do.indexes, index)
+		}
+
+		return nil
+	case NoPrefix:
+		for i := range do.Points {
+			do.indexes = append(do.indexes, i)
+		}
+
+		return nil
+	default:
+		return fmt.Errorf(
+			"cannot determine point indexes for prefix code %s",
+			do.Header.PointPrefixCode,
+		)
+	}
+}
+
 // ObjectHeader is used to describe the structure of application data.
 type ObjectHeader struct {
 	// Object Type Field
@@ -219,16 +319,16 @@ type rangeFieldConstructor func() RangeField
 
 var rangeFieldConstructors = map[RangeSpecCode]rangeFieldConstructor{
 	StartStop1:        func() RangeField { return &RangeField0{} },
-	VirtualStartStop1: func() RangeField { return &RangeField0{} },
 	StartStop2:        func() RangeField { return &RangeField1{} },
-	VirtualStartStop2: func() RangeField { return &RangeField1{} },
 	StartStop4:        func() RangeField { return &RangeField2{} },
-	VirtualStartStop4: func() RangeField { return &RangeField2{} },
+	VirtualStartStop1: func() RangeField { return &RangeField3{} },
+	VirtualStartStop2: func() RangeField { return &RangeField4{} },
+	VirtualStartStop4: func() RangeField { return &RangeField5{} },
 	NoRangeField:      func() RangeField { return &RangeField6{} },
 	Count1:            func() RangeField { return &RangeField7{} },
-	Count1Variable:    func() RangeField { return &RangeField7{} },
 	Count2:            func() RangeField { return &RangeField8{} },
 	Count4:            func() RangeField { return &RangeField9{} },
+	Count1Variable:    func() RangeField { return &RangeFieldB{} },
 }
 
 var reservedRangeSpecifiers = map[RangeSpecCode]struct{}{

@@ -9,6 +9,40 @@ import (
 	"time"
 )
 
+// AbsoluteTime is a DNP3 absolute timestamp (6-byte milliseconds since epoch).
+type AbsoluteTime time.Time
+
+func (absoluteTime *AbsoluteTime) Time() time.Time {
+	return time.Time(*absoluteTime)
+}
+
+func (absoluteTime *AbsoluteTime) String() string {
+	return time.Time(*absoluteTime).UTC().String()
+}
+
+func (absoluteTime *AbsoluteTime) MarshalJSON() ([]byte, error) {
+	jsonBytes, err := time.Time(*absoluteTime).MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal absolute time: %w", err)
+	}
+
+	return jsonBytes, nil
+}
+
+func (absoluteTime *AbsoluteTime) UnmarshalJSON(data []byte) error {
+	var parsed time.Time
+
+	err := parsed.UnmarshalJSON(data)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal absolute time: %w", err)
+	}
+
+	*absoluteTime = AbsoluteTime(parsed)
+
+	return nil
+}
+
+// RelativeTime is a DNP3 relative timestamp (2-byte millisecond offset).
 type RelativeTime time.Duration
 
 func (relativeTime RelativeTime) Duration() time.Duration {
@@ -130,9 +164,9 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 	return crcs, clean, nil
 }
 
-func BytesToDNP3TimeAbsolute(data []byte) (time.Time, error) {
+func BytesToDNP3TimeAbsolute(data []byte) (AbsoluteTime, error) {
 	if len(data) < 6 {
-		return time.Time{}, fmt.Errorf("absolute time requires 6 bytes, got %d", len(data))
+		return AbsoluteTime{}, fmt.Errorf("absolute time requires 6 bytes, got %d", len(data))
 	}
 
 	var padded [8]byte
@@ -140,18 +174,18 @@ func BytesToDNP3TimeAbsolute(data []byte) (time.Time, error) {
 
 	milliseconds := binary.LittleEndian.Uint64(padded[:])
 	if milliseconds > maxAbsoluteMilliseconds {
-		return time.Time{}, fmt.Errorf("absolute time overflow: %d", milliseconds)
+		return AbsoluteTime{}, fmt.Errorf("absolute time overflow: %d", milliseconds)
 	}
 
 	if milliseconds > uint64(math.MaxInt64) {
-		return time.Time{}, fmt.Errorf("absolute time exceeds supported range: %d", milliseconds)
+		return AbsoluteTime{}, fmt.Errorf("absolute time exceeds supported range: %d", milliseconds)
 	}
 
-	return time.UnixMilli(int64(milliseconds)), nil
+	return AbsoluteTime(time.UnixMilli(int64(milliseconds))), nil
 }
 
-func DNP3TimeAbsoluteToBytes(value time.Time) ([]byte, error) {
-	milliseconds := value.UnixMilli()
+func DNP3TimeAbsoluteToBytes(value AbsoluteTime) ([]byte, error) {
+	milliseconds := value.Time().UnixMilli()
 	if milliseconds < 0 {
 		return nil, fmt.Errorf("timestamp %v is negative", value)
 	} else if milliseconds > int64(maxAbsoluteMilliseconds) {
