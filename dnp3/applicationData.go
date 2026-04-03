@@ -1,6 +1,7 @@
 package dnp3
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -239,7 +240,7 @@ func (do *DataObject) updateIndexes() error {
 // fields by inspecting the object header's PointPrefixCode.
 func (do *DataObject) updateIndexesFromPrefix() error {
 	switch do.Header.PointPrefixCode {
-	case OctetIndex1, OctetIndex2, OctetIndex4:
+	case Index1Octet, Index2Octet, Index4Octet:
 		for _, point := range do.Points {
 			index, err := point.GetIndex()
 			if err != nil {
@@ -256,10 +257,14 @@ func (do *DataObject) updateIndexesFromPrefix() error {
 		}
 
 		return nil
-	default:
+	case Size1Octet, Size2Octet, Size4Octet:
 		return fmt.Errorf(
-			"cannot determine point indexes for prefix code %s",
+			"point prefix code %s does not determine indexes",
 			do.Header.PointPrefixCode,
 		)
+	case Reserved:
+		return errors.New("reserved point prefix code cannot be used to determine indexes")
+	default:
+		return fmt.Errorf("unexpected point prefix code %d", do.Header.PointPrefixCode)
 	}
 }

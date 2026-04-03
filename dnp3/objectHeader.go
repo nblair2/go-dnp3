@@ -128,47 +128,30 @@ func (oh *ObjectHeader) SizeOf() int {
 }
 
 // PointPrefixCode is a 4 bit description of how objects are packed.
+//
+//go:generate stringer -type=PointPrefixCode
 type PointPrefixCode uint8 // only 3 bits
 
 const (
-	NoPrefix = iota // 0
-	OctetIndex1
-	OctetIndex2
-	OctetIndex4
-	OctetSize1
-	OctetSize2
-	OctetSize4
+	NoPrefix PointPrefixCode = iota // 0
+	Index1Octet
+	Index2Octet
+	Index4Octet
+	Size1Octet
+	Size2Octet
+	Size4Octet
 	Reserved // 7
 )
 
-var PointPrefixCodeNames = map[PointPrefixCode]string{
-	NoPrefix:    "NO_PREFIX",
-	OctetIndex1: "1_OCTET_INDEX",
-	OctetIndex2: "2_OCTET_INDEX",
-	OctetIndex4: "4_OCTET_INDEX",
-	OctetSize1:  "1_OCTET_SIZE",
-	OctetSize2:  "2_OCTET_SIZE",
-	OctetSize4:  "4_OCTET_SIZE",
-	Reserved:    "RESERVED",
-}
-
 var PointPrefixCodeSize = map[PointPrefixCode]int{
 	NoPrefix:    0,
-	OctetIndex1: 1,
-	OctetIndex2: 2,
-	OctetIndex4: 4,
-	OctetSize1:  1,
-	OctetSize2:  2,
-	OctetSize4:  3,
+	Index1Octet: 1,
+	Index2Octet: 2,
+	Index4Octet: 4,
+	Size1Octet:  1,
+	Size2Octet:  2,
+	Size4Octet:  3,
 	Reserved:    0,
-}
-
-func (ppc PointPrefixCode) String() string {
-	if name, ok := PointPrefixCodeNames[ppc]; ok {
-		return name
-	}
-
-	return fmt.Sprintf("unknown object prefix code %d", ppc)
 }
 
 func (ppc PointPrefixCode) GetPointPrefixSize() int {

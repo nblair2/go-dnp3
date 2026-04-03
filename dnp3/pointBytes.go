@@ -3,6 +3,7 @@ package dnp3
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -521,11 +522,8 @@ func newPointsBytesGeneric(
 
 		// Tell the point whether its prefix is an index or a size
 		// BEFORE calling FromBytes, so setPrefixValue routes correctly.
-		switch prefCode {
-		case OctetSize1, OctetSize2, OctetSize4:
+		if slices.Contains([]PointPrefixCode{Size1Octet, Size2Octet, Size4Octet}, prefCode) {
 			point.sizeSize = prefSize
-		default:
-			// OctetIndex or NoPrefix — default to index handling.
 		}
 
 		pointDataStart := pointIndex * (width + prefSize)
