@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/nblair2/go-dnp3/compare/v1.0.1...v1.1.0) (2026-04-05)
+
+
+### Features
+
+* point accessors ([#15](https://github.com/nblair2/go-dnp3/issues/15)) ([7ab8e2d](https://github.com/nblair2/go-dnp3/commit/7ab8e2dd7e67a924bba824668482ac3bcd5bf9ef))
+
 ## [1.0.1](https://github.com/nblair2/go-dnp3/compare/v1.0.0...v1.0.1) (2025-12-31)
 
 
