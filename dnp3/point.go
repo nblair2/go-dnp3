@@ -1,698 +1,62 @@
 package dnp3
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"time"
 )
 
+// Point is the interface implemented by all DNP3 point types.
 type Point interface {
 	FromBytes(data []byte, prefSize int) error
 	ToBytes() ([]byte, error)
 	String() string
+	Fields() PointFields
+	DataType() PointDataType
+	GetIndex() (int, error)
+	GetFlags() (PointFlags, error)
+	GetAbsTime() (AbsoluteTime, error)
+	GetRelTime() (RelativeTime, error)
+	GetValue() any
+	SetIndex(index int) error
+	SetFlags(flags PointFlags) error
+	SetAbsTime(absTime AbsoluteTime) error
+	SetRelTime(relTime RelativeTime) error
+	SetValue(value any) error
 }
 
-type PointsConstructor func([]byte, int, int) ([]Point, int, error)
+// PointFields describes which optional fields are present on a Point.
+type PointFields struct {
+	Index        bool `json:"index"`
+	Size         bool `json:"size"`
+	Flags        bool `json:"flags"`
+	Value        bool `json:"value"`
+	AbsoluteTime bool `json:"absolute_time"`
+	RelativeTime bool `json:"relative_time"`
+}
+
+// PointDataType identifies the kind of data a Point holds.
+type PointDataType string
+
+const (
+	PointDataTypeBit   PointDataType = "1-bit"
+	PointDataType2Bits PointDataType = "2-bit"
+	PointDataTypeBytes PointDataType = "bytes"
+)
+
+type PointsConstructor func([]byte, int, int, PointPrefixCode) ([]Point, int, error)
 
 type PointsPacker func([]Point) ([]byte, error)
 
-type Point1Bit struct {
-	Value bool `json:"value"`
-}
-
-// should not be used directly.
-func (p *Point1Bit) FromBytes(data []byte, prefSize int) error {
-	if len(data) > 1 {
-		return errors.New("can't construct 1 bit point from multiple bytes")
-	} else if prefSize != 0 {
-		return errors.New("can't have a prefix on 1 bit packed points")
-	}
-
-	p.Value = data[0]&0b00000001 != 0
-
-	return nil
-}
-
-// should not be used directly.
-func (p *Point1Bit) ToBytes() ([]byte, error) {
-	if p.Value {
-		return []byte{0b00000001}, nil
-	}
-
-	return []byte{0b00000000}, nil
-}
-
-func (p *Point1Bit) String() string {
-	return fmt.Sprintf("Value: %t", p.Value)
-}
-
-func newPoints1Bit(data []byte, num, prefSize int) ([]Point, int, error) {
-	if num > (8 * len(data)) {
-		return nil, 0, fmt.Errorf("not enough bytes for %d bit points", num)
-	} else if prefSize != 0 {
-		return nil, 0, errors.New("prefix size must be 0 for packed bits")
-	}
-
-	var mask uint8
-
-	pointsOut := make([]Point, 0, num)
-
-	for pointIndex := range num {
-		mask = 0b00000001 << (pointIndex % 8)
-		sourceByte := data[pointIndex/8]
-		point := &Point1Bit{Value: (sourceByte & mask) != 0}
-		pointsOut = append(pointsOut, point)
-	}
-
-	size := (num + 7) / 8 // round up to nearest byte
-
-	return pointsOut, size, nil
-}
-
-func packerPoints1Bit(points []Point) ([]byte, error) {
-	var packed []byte
-
-	for pointOffset := 0; pointOffset < len(points); pointOffset += 8 {
-		var packedByte byte
-
-		for bitOffset := 0; bitOffset < 8 && pointOffset+bitOffset < len(points); bitOffset++ {
-			point, ok := points[pointOffset+bitOffset].(*Point1Bit)
-			if !ok {
-				return packed, fmt.Errorf("element %d is not *Point1Bit, got %T",
-					pointOffset+bitOffset, points[pointOffset+bitOffset])
-			}
-
-			if point.Value {
-				packedByte |= 1 << bitOffset
-			}
-		}
-
-		packed = append(packed, packedByte)
-	}
-
-	return packed, nil
-}
-
-type Point1BitFlags struct {
-	Prefix []byte     `json:"prefix,omitempty"`
-	Value  bool       `json:"value"`
-	Flags  PointFlags `json:"flags"`
-}
-
-func (p *Point1BitFlags) FromBytes(data []byte, prefSize int) error {
-	if len(data) > 1+prefSize {
-		return errors.New("can't construct 1 bit point with flags from multiple bytes")
-	}
-
-	if prefSize > 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	p.Value = data[prefSize]&0b10000000 != 0
-	b := data[prefSize] & 0b01111111 // clear bit 7
-
-	err := p.Flags.FromByte(b)
-	if err != nil {
-		return fmt.Errorf("couldn't decode flags byte: 0x % X, err: %w", b, err)
-	}
-
-	return nil
-}
-
-func (p *Point1BitFlags) ToBytes() ([]byte, error) {
-	output := p.Prefix
-
-	b := p.Flags.ToByte()
-	if p.Value {
-		b |= 0b10000000
-	}
-
-	return append(output, b), nil
-}
-
-func (p *Point1BitFlags) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	output += fmt.Sprintf("Value : %t\n", p.Value)
-	output += p.Flags.String()
-
-	return output
-}
-
-func newPoints1BitFlags(data []byte, num, prefSize int) ([]Point, int, error) {
-	if num > len(data) {
-		return nil, 0, fmt.Errorf("not enough bytes for %d 1-bit points with flags", num)
-	}
-
-	pointsOut := make([]Point, 0, num)
-
-	for pointIndex := range num {
-		point := &Point1BitFlags{}
-
-		err := point.FromBytes([]byte{data[pointIndex]}, prefSize)
-		if err != nil {
-			return pointsOut, num, fmt.Errorf("could not decode point: 0x % X, err: %w",
-				data[pointIndex], err)
-		}
-
-		pointsOut = append(pointsOut, point)
-	}
-
-	return pointsOut, num, nil
-}
-
-type Point2Bits struct {
-	Value [2]bool `json:"value"`
-}
-
-// should not be used directly.
-func (p *Point2Bits) FromBytes(data []byte, prefSize int) error {
-	if len(data) > 1 {
-		return errors.New("can't construct 2 bit point from multiple bytes")
-	} else if prefSize != 0 {
-		return errors.New("can't have prefix on 2 bit packed points")
-	}
-	// assume bit is the lowest order
-	p.Value = [2]bool{
-		data[0]&0b00000001 != 0,
-		data[0]&0b00000010 != 0,
-	}
-
-	return nil
-}
-
-// should not be used directly.
-func (p *Point2Bits) ToBytes() ([]byte, error) {
-	var packedValue byte
-	if p.Value[0] {
-		packedValue += 0b00000001
-	}
-
-	if p.Value[1] {
-		packedValue += 0b00000010
-	}
-
-	return []byte{packedValue}, nil
-}
-
-func (p *Point2Bits) String() string {
-	return fmt.Sprintf("%t\n%t", p.Value[0], p.Value[1])
-}
-
-func newPoints2Bits(data []byte, num, prefSize int) ([]Point, int, error) {
-	if num > (8*len(data))/2 {
-		return nil, 0, fmt.Errorf("not enough bytes for %d bit points", num)
-	} else if prefSize != 0 {
-		return nil, 0, errors.New("can't have a prefix for 2 bit packed")
-	}
-
-	var (
-		mask1 uint8
-		mask2 uint8
-	)
-
-	pointsOut := make([]Point, 0, num)
-
-	for pointIndex := range num {
-		mask1 = 0b00000001 << (pointIndex % 8)
-		mask2 = 0b00000010 << (pointIndex % 8)
-
-		sourceByte := data[pointIndex%8]
-		point := &Point2Bits{
-			Value: [2]bool{
-				(sourceByte & mask1) != 0,
-				(sourceByte & mask2) != 0,
-			},
-		}
-		pointsOut = append(pointsOut, point)
-	}
-
-	size := (num + 3) / 4 // round up to nearest byte
-
-	return pointsOut, size, nil
-}
-
-func packerPoints2Bits(points []Point) ([]byte, error) {
-	var packed []byte
-
-	for pointOffset := 0; pointOffset < len(points); pointOffset += 4 {
-		var packedByte byte
-
-		for pairIndex := 0; pairIndex < 4 && pointOffset+pairIndex < len(points); pairIndex++ {
-			elementIndex := pointOffset + pairIndex
-
-			point, ok := points[elementIndex].(*Point2Bits)
-			if !ok {
-				return packed, fmt.Errorf(
-					"element %d is not *Point2Bits, got %T",
-					elementIndex,
-					points[elementIndex],
-				)
-			}
-
-			if point.Value[0] {
-				packedByte |= 0b00000001 << (pairIndex * 2)
-			}
-
-			if point.Value[1] {
-				packedByte |= 0b00000010 << (pairIndex * 2)
-			}
-		}
-
-		packed = append(packed, packedByte)
-	}
-
-	return packed, nil
-}
-
-type PointNBytes struct {
-	Prefix []byte `json:"prefix,omitempty"`
-	Value  []byte `json:"value"`
-}
-
-func (p *PointNBytes) FromBytes(data []byte, prefSize int) error {
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	p.Value = data[prefSize:]
-
-	return nil
-}
-
-func (p *PointNBytes) ToBytes() ([]byte, error) {
-	return append(p.Prefix, p.Value...), nil
-}
-
-func (p *PointNBytes) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	return output + fmt.Sprintf("Value : 0x % X", p.Value)
-}
-
-func newPointNBytes() *PointNBytes {
-	return &PointNBytes{}
-}
-
-type PointNBytesFlags struct {
-	Prefix []byte     `json:"prefix,omitempty"`
-	Value  []byte     `json:"value"`
-	Flags  PointFlags `json:"flags"`
-}
-
-func (p *PointNBytesFlags) FromBytes(data []byte, prefSize int) error {
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	err := p.Flags.FromByte(data[prefSize])
-	if err != nil {
-		return fmt.Errorf("couldn't decode flags byte: 0x % X, err: %w", data[prefSize], err)
-	}
-
-	p.Value = data[prefSize+1:]
-
-	return nil
-}
-
-func (p *PointNBytesFlags) ToBytes() ([]byte, error) {
-	var output []byte
-
-	output = append(output, p.Prefix...)
-	output = append(output, p.Flags.ToByte())
-
-	return append(output, p.Value...), nil
-}
-
-func (p *PointNBytesFlags) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	output += fmt.Sprintf("Value : 0x % X\n", p.Value)
-	output += p.Flags.String()
-
-	return output
-}
-
-func newPointNBytesFlags() *PointNBytesFlags {
-	return &PointNBytesFlags{}
-}
-
-type PointNBytesFlagsAbsTime struct {
-	Prefix       []byte     `json:"prefix,omitempty"`
-	Value        []byte     `json:"value"`
-	Flags        PointFlags `json:"flags"`
-	AbsoluteTime time.Time  `json:"absolute_time"`
-}
-
-func (p *PointNBytesFlagsAbsTime) FromBytes(data []byte, prefSize int) error {
-	if len(data) != 8+prefSize {
-		return fmt.Errorf("need %d bytes, got %d", 8+prefSize, len(data))
-	}
-
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	err := p.Flags.FromByte(data[prefSize])
-	if err != nil {
-		return fmt.Errorf("couldn't decode flags byte: 0x % X, err: %w", data[prefSize], err)
-	}
-
-	absTime, err := BytesToDNP3TimeAbsolute(data[prefSize+1 : prefSize+7])
-	if err != nil {
-		return fmt.Errorf("couldn't decode absolute timestamp: %w", err)
-	}
-
-	p.AbsoluteTime = absTime
-	p.Value = data[prefSize+7:]
-
-	return nil
-}
-
-func (p *PointNBytesFlagsAbsTime) ToBytes() ([]byte, error) {
-	var output []byte
-
-	output = append(output, p.Prefix...)
-	output = append(output, p.Flags.ToByte())
-
-	timeBytes, err := DNP3TimeAbsoluteToBytes(p.AbsoluteTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode timestamp: %w", err)
-	}
-
-	output = append(output, timeBytes...)
-	output = append(output, p.Value...)
-
-	return output, nil
-}
-
-func (p *PointNBytesFlagsAbsTime) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	output += fmt.Sprintf("Value: 0x % X\n", p.Value)
-	output += p.Flags.String()
-	output += fmt.Sprintf("\nTimestamp: %s", p.AbsoluteTime.UTC())
-
-	return output
-}
-
-func newPointNBytesFlagsAbsTime() *PointNBytesFlagsAbsTime {
-	return &PointNBytesFlagsAbsTime{}
-}
-
-type PointNBytesAbsTime struct {
-	Prefix       []byte    `json:"prefix,omitempty"`
-	Value        []byte    `json:"value"`
-	AbsoluteTime time.Time `json:"absolute_time"`
-}
-
-func (p *PointNBytesAbsTime) FromBytes(data []byte, prefSize int) error {
-	if len(data) != 7+prefSize {
-		return fmt.Errorf("need %d bytes, got %d", 8+prefSize, len(data))
-	}
-
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	p.Value = data[prefSize : len(data)-6]
-
-	absTime, err := BytesToDNP3TimeAbsolute(data[len(data)-6:])
-	if err != nil {
-		return fmt.Errorf("couldn't decode absolute timestamp: %w", err)
-	}
-
-	p.AbsoluteTime = absTime
-
-	return nil
-}
-
-func (p *PointNBytesAbsTime) ToBytes() ([]byte, error) {
-	var output []byte
-
-	output = append(output, p.Prefix...)
-	output = append(output, p.Value...)
-
-	timeBytes, err := DNP3TimeAbsoluteToBytes(p.AbsoluteTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode timestamp: %w", err)
-	}
-
-	return append(output, timeBytes...), nil
-}
-
-func (p *PointNBytesAbsTime) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	output += fmt.Sprintf("Value: 0x % X", p.Value)
-	output += fmt.Sprintf("\nTimestamp: %s", p.AbsoluteTime.UTC())
-
-	return output
-}
-
-func newPointNBytesAbsTime() *PointNBytesAbsTime {
-	return &PointNBytesAbsTime{}
-}
-
-type PointNBytesRelTime struct {
-	Prefix       []byte       `json:"prefix,omitempty"`
-	Value        []byte       `json:"value"`
-	RelativeTime RelativeTime `json:"relative_time"`
-}
-
-func (p *PointNBytesRelTime) FromBytes(data []byte, prefSize int) error {
-	if len(data) < 3+prefSize {
-		return fmt.Errorf("need %d bytes, got %d", 3+prefSize, len(data))
-	}
-
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	p.Value = data[prefSize : len(data)-2]
-
-	relativeTime, err := BytesToDNP3TimeRelative(data[len(data)-2:])
-	if err != nil {
-		return fmt.Errorf("couldn't decode relative timestamp: %w", err)
-	}
-
-	p.RelativeTime = relativeTime
-
-	return nil
-}
-
-func (p *PointNBytesRelTime) ToBytes() ([]byte, error) {
-	var output []byte
-
-	output = append(output, p.Prefix...)
-	output = append(output, p.Value...)
-
-	timeBytes, err := DNP3TimeRelativeToBytes(p.RelativeTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode relative timestamp: %w", err)
-	}
-
-	return append(output, timeBytes...), nil
-}
-
-func (p *PointNBytesRelTime) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	output += fmt.Sprintf("Value: 0x % X", p.Value)
-	output += fmt.Sprintf("\nTimestamp offset: %s", p.RelativeTime)
-
-	return output
-}
-
-func newPointNBytesRelTime() *PointNBytesRelTime {
-	return &PointNBytesRelTime{}
-}
-
-type PointAbsTime struct {
-	Prefix       []byte    `json:"prefix,omitempty"`
-	AbsoluteTime time.Time `json:"absolute_time"`
-}
-
-func (p *PointAbsTime) FromBytes(data []byte, prefSize int) error {
-	if len(data) != 6+prefSize {
-		return fmt.Errorf("need %d bytes, got %d", 6+prefSize, len(data))
-	}
-
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	absTime, err := BytesToDNP3TimeAbsolute(data[0:6])
-	if err != nil {
-		return fmt.Errorf("couldn't decode absolute timestamp: %w", err)
-	}
-
-	p.AbsoluteTime = absTime
-
-	return nil
-}
-
-func (p *PointAbsTime) ToBytes() ([]byte, error) {
-	timeBytes, err := DNP3TimeAbsoluteToBytes(p.AbsoluteTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode timestamp: %w", err)
-	}
-
-	return append(p.Prefix, timeBytes...), nil
-}
-
-func (p *PointAbsTime) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	return output + fmt.Sprintf("Timestamp: %s", p.AbsoluteTime.UTC())
-}
-
-func newPointAbsTime() *PointAbsTime {
-	return &PointAbsTime{}
-}
-
-type PointRelTime struct {
-	Prefix       []byte       `json:"prefix,omitempty"`
-	RelativeTime RelativeTime `json:"relative_time"`
-}
-
-func (p *PointRelTime) FromBytes(data []byte, prefSize int) error {
-	if len(data) < 2+prefSize {
-		return fmt.Errorf("need %d bytes, got %d", prefSize+2, len(data))
-	}
-
-	if prefSize != 0 {
-		p.Prefix = data[0:prefSize]
-	}
-
-	relativeTime, err := BytesToDNP3TimeRelative(data[prefSize : prefSize+2])
-	if err != nil {
-		return fmt.Errorf("couldn't decode relative timestamp: %w", err)
-	}
-
-	p.RelativeTime = relativeTime
-
-	return nil
-}
-
-func (p *PointRelTime) ToBytes() ([]byte, error) {
-	timeBytes, err := DNP3TimeRelativeToBytes(p.RelativeTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode relative timestamp: %w", err)
-	}
-
-	return append(p.Prefix, timeBytes...), nil
-}
-
-func (p *PointRelTime) String() string {
-	output := ""
-	if len(p.Prefix) > 0 {
-		output += fmt.Sprintf("Prefix: 0x % X\n", p.Prefix)
-	}
-
-	return output + fmt.Sprintf("Timestamp offset: %s", p.RelativeTime)
-}
-
-func newPointRelTime() *PointRelTime {
-	return &PointRelTime{}
-}
-
-func makeGenericConstructor[T Point](
-	newPoint func() T,
-	width int,
-) PointsConstructor {
-	return func(data []byte, num, prefSize int) ([]Point, int, error) {
-		return newPointsGeneric[T](newPoint, data, width, num, prefSize)
-	}
-}
-
-func newPointsGeneric[T Point](
-	newPoint func() T,
-	data []byte,
-	width, num, prefSize int,
-) ([]Point, int, error) {
-	size := num * (prefSize + width)
-	if size > len(data) {
-		return nil, 0, fmt.Errorf(
-			"not enough bytes for %d %d-byte points with %d-byte prefix",
-			num,
-			width,
-			prefSize,
-		)
-	}
-
-	pointsOut := make([]Point, 0, num)
-
-	for pointIndex := range num {
-		point := newPoint()
-
-		pointDataStart := pointIndex * (width + prefSize)
-		pointDataEnd := (pointIndex + 1) * (width + prefSize)
-		pointData := data[pointDataStart:pointDataEnd]
-
-		err := point.FromBytes(pointData, prefSize)
-		if err != nil {
-			return pointsOut, size, fmt.Errorf("could not decode point: 0x % X, err: %w", data, err)
-		}
-
-		pointsOut = append(pointsOut, point)
-	}
-
-	return pointsOut, size, nil
-}
-
-func packPointsBytes(points []Point) ([]byte, error) {
-	var encoded []byte
-
-	for _, point := range points {
-		b, err := point.ToBytes()
-		if err != nil {
-			return nil, fmt.Errorf("error packing points: %w", err)
-		}
-
-		encoded = append(encoded, b...)
-	}
-
-	return encoded, nil
-}
-
-func constructorNoPoints(_ []byte, num, _ int) ([]Point, int, error) {
-	if num != 0 {
-		return nil, 0, fmt.Errorf("no points expected, got %d", num)
-	}
-
-	return nil, 0, nil
-}
-
-func packNoPoints(points []Point) ([]byte, error) {
-	if len(points) != 0 {
-		return nil, fmt.Errorf("no points expected, got %d", len(points))
-	}
-
-	return nil, nil
-}
-
+// Sentinel errors for unsupported Point field access.
+var (
+	ErrNoIndex   = errors.New("point does not have an index")
+	ErrNoFlags   = errors.New("point type does not have flags")
+	ErrNoAbsTime = errors.New("point type does not have an absolute time")
+	ErrNoRelTime = errors.New("point type does not have a relative time")
+)
+
+// PointFlags describes the quality flags common to most DNP3 point types.
 type PointFlags struct {
 	Reserved       bool `json:"reserved"` // should be 0
 	PointValue     bool `json:"point_value"`
@@ -761,13 +125,161 @@ func (f *PointFlags) ToByte() byte {
 
 func (f *PointFlags) String() string {
 	return fmt.Sprintf(`Flags:
-	Reference Check: %t
-	Over-Range     : %t
-	Local Force    : %t
-	Remote Force   : %t
-	Comm Fail      : %t
-	Restart        : %t
-	Online         : %t`,
+Reference Check: %t
+Over-Range     : %t
+Local Force    : %t
+Remote Force   : %t
+Comm Fail      : %t
+Restart        : %t
+Online         : %t`,
 		f.ReferenceCheck, f.OverRange, f.LocalForce, f.RemoteForce,
 		f.CommFail, f.Restart, f.Online)
+}
+
+// --- Prefix helpers ---
+
+// prefixToInt decodes a little-endian prefix byte slice as an int.
+func prefixToInt(prefix []byte) (int, error) {
+	switch len(prefix) {
+	case 0:
+		return 0, ErrNoIndex
+	case 1:
+		return int(prefix[0]), nil
+	case 2:
+		return int(binary.LittleEndian.Uint16(prefix)), nil
+	case 3:
+		var padded [4]byte
+		copy(padded[:3], prefix)
+
+		return int(binary.LittleEndian.Uint32(padded[:])), nil
+	case 4:
+		return int(binary.LittleEndian.Uint32(prefix)), nil
+	default:
+		return 0, fmt.Errorf("unsupported prefix size: %d bytes", len(prefix))
+	}
+}
+
+// intToPrefixSized encodes an int as a little-endian byte slice of exactly
+// the given width (1, 2, 3, or 4 bytes).
+func intToPrefixSized(value int, size int) ([]byte, error) {
+	switch size {
+	case 1:
+		if value > 0xFF {
+			return nil, fmt.Errorf("value %d exceeds 1-byte index max (255)", value)
+		}
+
+		// #nosec G115 -- value range is clamped above
+		return []byte{byte(value)}, nil
+	case 2:
+		if value > 0xFFFF {
+			return nil, fmt.Errorf("value %d exceeds 2-byte index max (65535)", value)
+		}
+
+		b := make([]byte, 2)
+		// #nosec G115 -- value range is clamped above
+		binary.LittleEndian.PutUint16(b, uint16(value))
+
+		return b, nil
+	case 3:
+		if value > 0xFFFFFF {
+			return nil, fmt.Errorf("value %d exceeds 3-byte index max (16777215)", value)
+		}
+
+		b := make([]byte, 4)
+		//nolint:gosec // G115 - value range is clamped above
+		binary.LittleEndian.PutUint32(b, uint32(value))
+
+		return b[:3], nil
+	case 4:
+		b := make([]byte, 4)
+		//nolint:gosec // G115 - value range is clamped by int
+		binary.LittleEndian.PutUint32(b, uint32(value))
+
+		return b, nil
+	default:
+		return nil, fmt.Errorf("unsupported index size: %d bytes", size)
+	}
+}
+
+// intToPrefix encodes an int as a little-endian byte slice. If size is
+// positive the encoding uses exactly that many bytes; otherwise the
+// minimal DNP3 prefix width (1, 2, or 4 bytes) is chosen automatically.
+func intToPrefix(value int, size int) ([]byte, error) {
+	if value < 0 {
+		return nil, fmt.Errorf("index value must be non-negative, got %d", value)
+	}
+
+	if size == 0 {
+		switch {
+		case value <= 0xFF:
+			size = 1
+		case value <= 0xFFFF:
+			size = 2
+		default:
+			size = 4
+		}
+	}
+
+	return intToPrefixSized(value, size)
+}
+
+// setIndex validates and stores an index value, auto-determining
+// the encoding width if one has not been set.
+func setIndex(index **int, indexSize *int, value int) error {
+	if value < 0 {
+		return fmt.Errorf("index must be non-negative, got %d", value)
+	}
+
+	if *indexSize > 0 {
+		_, err := intToPrefix(value, *indexSize)
+		if err != nil {
+			return err
+		}
+	} else {
+		switch {
+		case value <= 0xFF:
+			*indexSize = 1
+		case value <= 0xFFFF:
+			*indexSize = 2
+		default:
+			*indexSize = 4
+		}
+	}
+
+	*index = &value
+
+	return nil
+}
+
+// --- General-purpose constructors/packers ---
+
+func packPointsBytes(points []Point) ([]byte, error) {
+	var encoded []byte
+
+	for _, point := range points {
+		b, err := point.ToBytes()
+		if err != nil {
+			return nil, fmt.Errorf("error packing points: %w", err)
+		}
+
+		encoded = append(encoded, b...)
+	}
+
+	return encoded, nil
+}
+
+func constructorNoPoints(_ []byte, num, _ int, _ PointPrefixCode) ([]Point, int, error) {
+	if num != 0 {
+		return nil, 0, fmt.Errorf("no points expected, got %d", num)
+	}
+
+	return nil, 0, nil
+}
+
+func packNoPoints(points []Point) ([]byte, error) {
+	if len(points) != 0 {
+		return nil, fmt.Errorf("no points expected, got %d", len(points))
+	}
+
+	return nil, nil
 }

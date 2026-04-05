@@ -33,11 +33,25 @@ func main() {
 
 	// Change data
 	data := frame.Application.GetData()
-	data.Objects[0].Points[0] = &dnp3.PointNBytesAbsTime{
-		Prefix:       []byte{0x01, 0x02},
-		Value:        []byte{0xFF},
-		AbsoluteTime: time.Date(2010, time.July, 1, 0, 0, 0, 0, time.UTC),
+
+	point := data.Objects[0].Points[0].(*dnp3.PointBytes)
+
+	if err := point.SetIndex(0x0201); err != nil {
+		log.Fatalf("Failed to set index: %v", err)
 	}
+
+	if err := point.SetValue([]byte{0xFF}); err != nil {
+		log.Fatalf("Failed to set value: %v", err)
+	}
+
+	timestamp := time.Date(2010, time.July, 1, 0, 0, 0, 0, time.UTC)
+	absTime := dnp3.AbsoluteTime(timestamp)
+
+	if err := point.SetAbsTime(absTime); err != nil {
+		log.Fatalf("Failed to set absolute time: %v", err)
+	}
+
+	data.Objects[0].Points[0] = point
 	frame.Application.SetData(data)
 
 	// Convert back to bytes (forces CRC recalculation)
