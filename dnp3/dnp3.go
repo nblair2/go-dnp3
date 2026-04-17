@@ -27,6 +27,18 @@ func NewFrame() *Frame {
 	return &Frame{}
 }
 
+// NewFrameFromBytes returns a new Frame parsed from the given bytes.
+func NewFrameFromBytes(data []byte) (*Frame, error) {
+	frame := &Frame{}
+
+	err := frame.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return frame, nil
+}
+
 // DNP3Type (required by gopacket).
 var LayerTypeDNP3 = gopacket.RegisterLayerType(20000,
 	gopacket.LayerTypeMetadata{

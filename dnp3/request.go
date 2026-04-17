@@ -18,6 +18,19 @@ func NewApplicationRequest() *ApplicationRequest {
 	return &ApplicationRequest{}
 }
 
+// NewApplicationRequestFromBytes returns a new ApplicationRequest parsed from
+// the given bytes.
+func NewApplicationRequestFromBytes(data []byte) (*ApplicationRequest, error) {
+	request := &ApplicationRequest{}
+
+	err := request.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return request, nil
+}
+
 func (appreq *ApplicationRequest) FromBytes(data []byte) error {
 	appreq.Control.FromByte(data[0])
 
