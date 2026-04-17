@@ -14,6 +14,13 @@ type Transport struct {
 	Checksums [][]byte `json:"checksums"`
 }
 
+// NewTransport returns a new Transport ready to be populated via FromBytes or
+// by setting fields directly. All fields default to their zero values, which
+// are valid starting points for both parsing and manual construction.
+func NewTransport() *Transport {
+	return &Transport{}
+}
+
 func (trans *Transport) FromBytes(data []byte) ([]byte, error) {
 	crcs, clean, err := RemoveDNP3CRCs(data)
 	if err != nil {

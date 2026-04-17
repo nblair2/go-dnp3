@@ -22,7 +22,7 @@ func main() {
 	}
 
 	// Parse the input bytes into a DNP3 Frame
-	frame := dnp3.Frame{}
+	frame := dnp3.NewFrame()
 	if err := frame.FromBytes(input); err != nil {
 		log.Fatalf("Failed to parse frame: %v", err)
 	}
