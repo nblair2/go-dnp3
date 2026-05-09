@@ -17,6 +17,25 @@ type DataLink struct {
 	Checksum    [2]byte         `json:"checksum"`
 }
 
+// NewDataLink returns a new DataLink ready to be populated via FromBytes or
+// by setting fields directly. The Synchronize bytes are set automatically by
+// ToBytes, so they do not need to be initialized manually.
+func NewDataLink() *DataLink {
+	return &DataLink{}
+}
+
+// NewDataLinkFromBytes returns a new DataLink parsed from the given bytes.
+func NewDataLinkFromBytes(data []byte) (*DataLink, error) {
+	dataLink := &DataLink{}
+
+	err := dataLink.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataLink, nil
+}
+
 func (dl *DataLink) FromBytes(data []byte) error {
 	if data[0] != 0x05 || data[1] != 0x64 {
 		return fmt.Errorf(

@@ -13,6 +13,26 @@ type ApplicationResponse struct {
 	Data                ApplicationData                `json:"data"`
 }
 
+// NewApplicationResponse returns a new ApplicationResponse ready to be populated
+// via FromBytes or by setting fields directly. All fields default to their zero
+// values, which are valid starting points for both parsing and manual construction.
+func NewApplicationResponse() *ApplicationResponse {
+	return &ApplicationResponse{}
+}
+
+// NewApplicationResponseFromBytes returns a new ApplicationResponse parsed from
+// the given bytes.
+func NewApplicationResponseFromBytes(data []byte) (*ApplicationResponse, error) {
+	response := &ApplicationResponse{}
+
+	err := response.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (appresp *ApplicationResponse) FromBytes(data []byte) error {
 	appresp.Control.FromByte(data[0])
 

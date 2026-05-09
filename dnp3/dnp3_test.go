@@ -170,11 +170,9 @@ func TestCustomPcaps(t *testing.T) {
 func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
 	t.Helper()
 
-	packet := dnp3.Frame{}
-
-	err := packet.FromBytes(input)
+	packet, err := dnp3.NewFrameFromBytes(input)
 	if err != nil {
-		t.Fatal("FromBytes:", err)
+		t.Fatal("NewFrameFromBytes:", err)
 	}
 
 	if packet.Application != nil {

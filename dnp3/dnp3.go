@@ -19,6 +19,26 @@ type Frame struct {
 	Application Application `json:"application"`
 }
 
+// NewFrame returns a new Frame ready to be populated via FromBytes or by
+// setting fields directly. The Application field is nil until populated; it is
+// set automatically to the appropriate type (ApplicationRequest or
+// ApplicationResponse) when FromBytes is called.
+func NewFrame() *Frame {
+	return &Frame{}
+}
+
+// NewFrameFromBytes returns a new Frame parsed from the given bytes.
+func NewFrameFromBytes(data []byte) (*Frame, error) {
+	frame := &Frame{}
+
+	err := frame.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return frame, nil
+}
+
 // DNP3Type (required by gopacket).
 var LayerTypeDNP3 = gopacket.RegisterLayerType(20000,
 	gopacket.LayerTypeMetadata{

@@ -11,6 +11,26 @@ type ApplicationRequest struct {
 	Data         ApplicationData     `json:"data"`
 }
 
+// NewApplicationRequest returns a new ApplicationRequest ready to be populated
+// via FromBytes or by setting fields directly. All fields default to their zero
+// values, which are valid starting points for both parsing and manual construction.
+func NewApplicationRequest() *ApplicationRequest {
+	return &ApplicationRequest{}
+}
+
+// NewApplicationRequestFromBytes returns a new ApplicationRequest parsed from
+// the given bytes.
+func NewApplicationRequestFromBytes(data []byte) (*ApplicationRequest, error) {
+	request := &ApplicationRequest{}
+
+	err := request.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return request, nil
+}
+
 func (appreq *ApplicationRequest) FromBytes(data []byte) error {
 	appreq.Control.FromByte(data[0])
 
