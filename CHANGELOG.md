@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/nblair2/go-dnp3/compare/v1.1.0...v1.2.0) (2026-05-09)
+
+
+### Features
+
+* add New* and New*FromBytes constructor pairs ([#19](https://github.com/nblair2/go-dnp3/issues/19)) ([de5dd2e](https://github.com/nblair2/go-dnp3/commit/de5dd2e6502c507969640392af72e4c7b9ea6656))
+
 ## [1.1.0](https://github.com/nblair2/go-dnp3/compare/v1.0.1...v1.1.0) (2026-04-05)
 
 
