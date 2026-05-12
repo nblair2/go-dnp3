@@ -404,14 +404,14 @@ func (p *PointBytes) encodeField(field pointField) ([]byte, error) {
 			return nil, errors.New("absolute time field is required by layout but is nil")
 		}
 
-		return DNP3TimeAbsoluteToBytes(*p.AbsoluteTime)
+		return TimeAbsoluteToBytes(*p.AbsoluteTime)
 
 	case pointFieldRelTime:
 		if p.RelativeTime == nil {
 			return nil, errors.New("relative time field is required by layout but is nil")
 		}
 
-		return DNP3TimeRelativeToBytes(*p.RelativeTime)
+		return TimeRelativeToBytes(*p.RelativeTime)
 
 	case pointFieldValue:
 		return p.encodeFieldValue(), nil
@@ -474,13 +474,7 @@ func newPointBytesWithLayout(layout pointBytesLayout, width int) func() *PointBy
 
 	calculatedExpectedValueSize := 0
 	if layout.hasField(pointFieldValue) {
-		calculatedExpectedValueSize = width - fixedFieldsWidth
-		if calculatedExpectedValueSize < 0 {
-			// This should not happen if width is correctly calculated in objectType.go
-			// but as a safeguard, we can set it to 0 or return an error.
-			// For now, let's assume it means no specific value size is expected.
-			calculatedExpectedValueSize = 0
-		}
+		calculatedExpectedValueSize = max(width-fixedFieldsWidth, 0)
 	}
 
 	return func() *PointBytes {

@@ -14,6 +14,24 @@ type ApplicationData struct {
 	extra []byte
 }
 
+// NewApplicationData returns a new ApplicationData ready to be populated via
+// FromBytes or by setting fields directly.
+func NewApplicationData() *ApplicationData {
+	return &ApplicationData{}
+}
+
+// NewApplicationDataFromBytes returns a new ApplicationData parsed from the given bytes.
+func NewApplicationDataFromBytes(data []byte) (*ApplicationData, error) {
+	appData := &ApplicationData{}
+
+	err := appData.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return appData, nil
+}
+
 func (ad *ApplicationData) FromBytes(data []byte) error {
 	ad.Objects = nil // in case there was already stuff here
 
@@ -84,12 +102,38 @@ func (ad *ApplicationData) HasExtra() bool {
 	return len(ad.extra) > 0
 }
 
+func (ad *ApplicationData) GetExtra() []byte {
+	return ad.extra
+}
+
+func (ad *ApplicationData) SetExtra(extra []byte) {
+	ad.extra = extra
+}
+
 type DataObject struct {
 	Header    ObjectHeader `json:"header"`
 	Points    []Point      `json:"points"`
 	Extra     []byte       `json:"extra,omitempty"`
 	totalSize int
 	indexes   []int
+}
+
+// NewDataObject returns a new DataObject ready to be populated via FromBytes
+// or by setting fields directly.
+func NewDataObject() *DataObject {
+	return &DataObject{}
+}
+
+// NewDataObjectFromBytes returns a new DataObject parsed from the given bytes.
+func NewDataObjectFromBytes(data []byte) (*DataObject, error) {
+	dataObj := &DataObject{}
+
+	err := dataObj.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return dataObj, nil
 }
 
 func (do *DataObject) FromBytes(data []byte) error {

@@ -19,6 +19,24 @@ type ObjectHeader struct {
 	size            int
 }
 
+// NewObjectHeader returns a new ObjectHeader ready to be populated via FromBytes
+// or by setting fields directly.
+func NewObjectHeader() *ObjectHeader {
+	return &ObjectHeader{}
+}
+
+// NewObjectHeaderFromBytes returns a new ObjectHeader parsed from the given bytes.
+func NewObjectHeaderFromBytes(data []byte) (*ObjectHeader, error) {
+	objHeader := &ObjectHeader{}
+
+	err := objHeader.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return objHeader, nil
+}
+
 func (oh *ObjectHeader) FromBytes(data []byte) error {
 	if len(data) < 3 {
 		return fmt.Errorf("object headers are at 3 - 11 bytes, got %d", len(data))

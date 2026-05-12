@@ -211,7 +211,7 @@ func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
 func splitComma(s string) []string {
 	var out []string
 
-	for _, v := range strings.Split(s, ",") {
+	for v := range strings.SplitSeq(s, ",") {
 		v = strings.TrimSpace(v)
 		if v != "" {
 			out = append(out, v)
@@ -219,4 +219,173 @@ func splitComma(s string) []string {
 	}
 
 	return out
+}
+
+// readBinaryInputChange is a 18-byte frame used across ParseFrames tests.
+var readBinaryInputChange = []byte{
+	0x05, 0x64, 0x0b, 0xc4, 0x00, 0x04, 0x01, 0x00,
+	0xca, 0x8a, 0xc0, 0xc1, 0x01, 0x02, 0x00, 0x06,
+	0x95, 0x76,
+}
+
+// readClass1230 is a 27-byte frame used across ParseFrames tests.
+var readClass1230 = []byte{
+	0x05, 0x64, 0x14, 0xc4, 0x04, 0x00, 0x03, 0x00,
+	0xc7, 0x17, 0xc4, 0xc5, 0x01, 0x3c, 0x02, 0x06,
+	0x3c, 0x03, 0x06, 0x3c, 0x04, 0x06, 0x3c, 0x01,
+	0x06, 0xa3, 0x61,
+}
+
+func TestParseFrames_empty(t *testing.T) {
+	t.Parallel()
+
+	frames, remainder, err := dnp3.ParseFrames(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frames) != 0 {
+		t.Fatalf("expected 0 frames, got %d", len(frames))
+	}
+
+	if len(remainder) != 0 {
+		t.Fatalf("expected empty remainder, got %d bytes", len(remainder))
+	}
+}
+
+func TestParseFrames_single(t *testing.T) {
+	t.Parallel()
+
+	frames, remainder, err := dnp3.ParseFrames(readBinaryInputChange)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 frame, got %d", len(frames))
+	}
+
+	if len(remainder) != 0 {
+		t.Fatalf("expected empty remainder, got %d bytes", len(remainder))
+	}
+}
+
+func TestParseFrames_two(t *testing.T) {
+	t.Parallel()
+
+	input := append(slices.Clone(readBinaryInputChange), readClass1230...)
+
+	frames, remainder, err := dnp3.ParseFrames(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frames) != 2 {
+		t.Fatalf("expected 2 frames, got %d", len(frames))
+	}
+
+	if len(remainder) != 0 {
+		t.Fatalf("expected empty remainder, got %d bytes", len(remainder))
+	}
+}
+
+func TestParseFrames_partialHeader(t *testing.T) {
+	t.Parallel()
+
+	// First frame complete; trailing 5 bytes are a partial header.
+	partial := readClass1230[:5]
+	input := append(slices.Clone(readBinaryInputChange), partial...)
+
+	frames, remainder, err := dnp3.ParseFrames(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 frame, got %d", len(frames))
+	}
+
+	if !slices.Equal(remainder, partial) {
+		t.Fatalf("expected remainder %x, got %x", partial, remainder)
+	}
+}
+
+func TestParseFrames_partialBody(t *testing.T) {
+	t.Parallel()
+
+	// First frame complete; trailing bytes have a valid header but incomplete body.
+	partial := readClass1230[:12] // 10-byte header + 2 body bytes, needs 27 total
+	input := append(slices.Clone(readBinaryInputChange), partial...)
+
+	frames, remainder, err := dnp3.ParseFrames(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(frames) != 1 {
+		t.Fatalf("expected 1 frame, got %d", len(frames))
+	}
+
+	if !slices.Equal(remainder, partial) {
+		t.Fatalf("expected remainder %x, got %x", partial, remainder)
+	}
+}
+
+// TestFromBytes_concatenatedFrames is a regression test for the CRC-corruption
+// bug: passing two frames in one buffer must not corrupt the first frame's CRC
+// validation.
+func TestFromBytes_concatenatedFrames(t *testing.T) {
+	t.Parallel()
+
+	// Two valid frames concatenated in a single buffer.
+	buf := append(slices.Clone(readBinaryInputChange), readClass1230...)
+
+	frame, err := dnp3.NewFrameFromBytes(buf)
+	if err != nil {
+		t.Fatalf("FromBytes failed on concatenated buffer: %v", err)
+	}
+
+	// Re-encode and compare only the first frame's bytes.
+	got, err := frame.ToBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Equal(got, readBinaryInputChange) {
+		t.Fatalf("re-encoded frame mismatch\nwant: %x\n got: %x", readBinaryInputChange, got)
+	}
+}
+
+func TestApplicationData_GetSetExtra(t *testing.T) {
+	t.Parallel()
+
+	appData := dnp3.NewApplicationData()
+	if appData.HasExtra() {
+		t.Fatal("new ApplicationData should have no extra")
+	}
+
+	if appData.GetExtra() != nil {
+		t.Fatal("GetExtra should return nil when not set")
+	}
+
+	extra := []byte{0xDE, 0xAD, 0xBE, 0xEF}
+	appData.SetExtra(extra)
+
+	if !appData.HasExtra() {
+		t.Fatal("HasExtra should be true after SetExtra")
+	}
+
+	if !slices.Equal(appData.GetExtra(), extra) {
+		t.Fatalf("GetExtra returned %x, want %x", appData.GetExtra(), extra)
+	}
+
+	// ToBytes should include the extra bytes in output.
+	out, err := appData.ToBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Equal(out, extra) {
+		t.Fatalf("ToBytes returned %x, want %x", out, extra)
+	}
 }

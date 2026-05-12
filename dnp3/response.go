@@ -38,7 +38,7 @@ func (appresp *ApplicationResponse) FromBytes(data []byte) error {
 
 	appresp.FunctionCode = ResponseFunctionCode(data[1])
 
-	err := appresp.InternalIndications.FromBytes(data[2], data[3])
+	err := appresp.InternalIndications.FromBytes(data[2:4])
 	if err != nil {
 		return fmt.Errorf("can't create application response: %w", err)
 	}
@@ -157,7 +157,37 @@ type ApplicationInternalIndications struct {
 	Reserved2        bool `json:"reserved_2"` // ^
 }
 
-func (appiin *ApplicationInternalIndications) FromBytes(lsb, msb byte) error {
+// NewApplicationInternalIndications returns a new ApplicationInternalIndications
+// ready to be populated via FromBytes or by setting fields directly.
+func NewApplicationInternalIndications() *ApplicationInternalIndications {
+	return &ApplicationInternalIndications{}
+}
+
+// NewApplicationInternalIndicationsFromBytes returns a new
+// ApplicationInternalIndications parsed from the given bytes.
+func NewApplicationInternalIndicationsFromBytes(
+	data []byte,
+) (*ApplicationInternalIndications, error) {
+	appiin := &ApplicationInternalIndications{}
+
+	err := appiin.FromBytes(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return appiin, nil
+}
+
+func (appiin *ApplicationInternalIndications) FromBytes(data []byte) error {
+	if len(data) != 2 {
+		return fmt.Errorf(
+			"ApplicationInternalIndications requires exactly 2 bytes, got %d",
+			len(data),
+		)
+	}
+
+	lsb, msb := data[0], data[1]
+
 	appiin.AllStations = (lsb & 0b00000001) != 0
 	appiin.Class1Events = (lsb & 0b00000010) != 0
 	appiin.Class2Events = (lsb & 0b00000100) != 0
