@@ -22,7 +22,7 @@ type PointBit struct {
 
 func (p *PointBit) DataType() PointDataType { return PointDataTypeBit }
 
-// should not be used directly for packed (non-flags) points.
+// FromBytes should not be used directly for packed (non-flags) points.
 func (p *PointBit) FromBytes(data []byte, prefSize int) error {
 	if p.hasFlags {
 		return p.fromBytesFlags(data, prefSize)
@@ -39,7 +39,7 @@ func (p *PointBit) FromBytes(data []byte, prefSize int) error {
 	return nil
 }
 
-// should not be used directly for packed (non-flags) points.
+// ToBytes should not be used directly for packed (non-flags) points.
 func (p *PointBit) ToBytes() ([]byte, error) {
 	if p.hasFlags {
 		return p.toBytesFlags()

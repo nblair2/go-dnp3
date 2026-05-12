@@ -7,6 +7,7 @@ linters:
     - bidichk
     - bodyclose
     - canonicalheader
+    - clickhouselint
     - containedctx
     - contextcheck
     - copyloopvar
@@ -36,12 +37,12 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    # - godoclint
+    - godoclint
     - godot
     - godox
     - goheader
     - gomoddirectives
-    - gomodguard
+    - gomodguard_v2
     - goprintffuncname
     - gosec
     - gosmopolitan
@@ -60,7 +61,7 @@ linters:
     - makezero
     - mirror
     - misspell
-    # - mnd
+    - modernize
     - musttag
     - nakedret
     - nestif
@@ -129,21 +130,15 @@ linters:
       # Maybe one day
       - linters:
           - revive
-        text: "should have comment or be unexported"
-      - linters:
-          - revive 
-        text: "exported: "
+        text: "should have comment"
 
   disable:
-    # Never
     - depguard         # requires manual config of imports
     - interfacebloat   # limits interfaces to 10 methods
     - err113           # does not allow dynamic error
     - exhaustruct      # does not allow empty struct initialization (something something OOP)
     - gochecknoglobals # does not allow globals
     - mnd              # does not allow magic numbers which is everywhere in protocol parsing
-    # Maybe one day
-    - godoclint        # re-add eventually (revive comment/unexported too)
 
 formatters:
   enable:

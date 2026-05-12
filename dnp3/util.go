@@ -184,7 +184,7 @@ func BytesToDNP3TimeAbsolute(data []byte) (AbsoluteTime, error) {
 	return AbsoluteTime(time.UnixMilli(int64(milliseconds))), nil
 }
 
-func DNP3TimeAbsoluteToBytes(value AbsoluteTime) ([]byte, error) {
+func TimeAbsoluteToBytes(value AbsoluteTime) ([]byte, error) {
 	milliseconds := value.Time().UnixMilli()
 	if milliseconds < 0 {
 		return nil, fmt.Errorf("timestamp %v is negative", value)
@@ -211,7 +211,7 @@ func BytesToDNP3TimeRelative(data []byte) (RelativeTime, error) {
 	return RelativeTime(time.Duration(milliseconds) * time.Millisecond), nil
 }
 
-func DNP3TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
+func TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
 	relativeDuration := relativeTime.Duration()
 	milliseconds := int64(relativeDuration / time.Millisecond)
 
@@ -230,7 +230,7 @@ func DNP3TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
 func indent(s, prefix string) string {
 	var lines []string
 
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if line != "" {
 			lines = append(lines, prefix+line)
 		} else {

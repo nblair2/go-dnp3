@@ -21,7 +21,22 @@ func main() {
 		0x64, 0x71, 0x01, 0x38, 0x5d,
 	}
 
-	// Parse the input bytes into a DNP3 Frame
+	// ParseFrames handles raw TCP reads that may contain multiple DNP3 frames
+	// or a trailing partial frame. It returns all complete frames and any
+	// unconsumed bytes so the caller can prepend them to the next read.
+	tcpSegment := append(input, input...) // two frames in one segment
+	frames, remainder, err := dnp3.ParseFrames(tcpSegment)
+	if err != nil {
+		log.Fatalf("Failed to parse frames: %v", err)
+	}
+
+	fmt.Printf("--- ParseFrames: %d frame(s), %d remainder byte(s) ---\n", len(frames), len(remainder))
+
+	for i, f := range frames {
+		fmt.Printf("Frame %d:\n%s\n", i+1, f.String())
+	}
+
+	// Parse the input bytes into a single DNP3 Frame
 	frame, err := dnp3.NewFrameFromBytes(input)
 	if err != nil {
 		log.Fatalf("Failed to parse frame: %v", err)
