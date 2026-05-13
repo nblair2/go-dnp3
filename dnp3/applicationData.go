@@ -15,7 +15,7 @@ type ApplicationData struct {
 }
 
 // NewApplicationData returns a new ApplicationData ready to be populated via
-// FromBytes or by setting fields directly.
+// DecodeFromBytes or by setting fields directly.
 func NewApplicationData() *ApplicationData {
 	return &ApplicationData{}
 }
@@ -24,7 +24,7 @@ func NewApplicationData() *ApplicationData {
 func NewApplicationDataFromBytes(data []byte) (*ApplicationData, error) {
 	appData := &ApplicationData{}
 
-	err := appData.FromBytes(data)
+	err := appData.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -32,13 +32,13 @@ func NewApplicationDataFromBytes(data []byte) (*ApplicationData, error) {
 	return appData, nil
 }
 
-func (ad *ApplicationData) FromBytes(data []byte) error {
+func (ad *ApplicationData) DecodeFromBytes(data []byte) error {
 	ad.Objects = nil // in case there was already stuff here
 
 	for readOffset := 0; readOffset < len(data); {
 		var object DataObject
 
-		err := object.FromBytes(data[readOffset:])
+		err := object.DecodeFromBytes(data[readOffset:])
 		if err != nil {
 			ad.extra = data[readOffset:]
 
@@ -53,11 +53,11 @@ func (ad *ApplicationData) FromBytes(data []byte) error {
 	return nil
 }
 
-func (ad *ApplicationData) ToBytes() ([]byte, error) {
+func (ad *ApplicationData) SerializeTo() ([]byte, error) {
 	var encoded []byte
 
 	for _, object := range ad.Objects {
-		bytesOut, err := object.ToBytes()
+		bytesOut, err := object.SerializeTo()
 		if err != nil {
 			return encoded, fmt.Errorf("could not encode object: %w", err)
 		}
@@ -118,7 +118,7 @@ type DataObject struct {
 	indexes   []int
 }
 
-// NewDataObject returns a new DataObject ready to be populated via FromBytes
+// NewDataObject returns a new DataObject ready to be populated via DecodeFromBytes
 // or by setting fields directly.
 func NewDataObject() *DataObject {
 	return &DataObject{}
@@ -128,7 +128,7 @@ func NewDataObject() *DataObject {
 func NewDataObjectFromBytes(data []byte) (*DataObject, error) {
 	dataObj := &DataObject{}
 
-	err := dataObj.FromBytes(data)
+	err := dataObj.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +136,8 @@ func NewDataObjectFromBytes(data []byte) (*DataObject, error) {
 	return dataObj, nil
 }
 
-func (do *DataObject) FromBytes(data []byte) error {
-	err := do.Header.FromBytes(data)
+func (do *DataObject) DecodeFromBytes(data []byte) error {
+	err := do.Header.DecodeFromBytes(data)
 	if err != nil {
 		return fmt.Errorf("can't create Data Object Header: %w", err)
 	}
@@ -180,11 +180,11 @@ func (do *DataObject) FromBytes(data []byte) error {
 	return nil
 }
 
-func (do *DataObject) ToBytes() ([]byte, error) {
+func (do *DataObject) SerializeTo() ([]byte, error) {
 	// TODO get this to be more elegant.
 	var encoded []byte
 
-	headerBytes, err := do.Header.ToBytes()
+	headerBytes, err := do.Header.SerializeTo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode object header: %w", err)
 	}

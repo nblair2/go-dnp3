@@ -17,9 +17,9 @@ type DataLink struct {
 	Checksum    [2]byte         `json:"checksum"`
 }
 
-// NewDataLink returns a new DataLink ready to be populated via FromBytes or
+// NewDataLink returns a new DataLink ready to be populated via DecodeFromBytes or
 // by setting fields directly. The Synchronize bytes are set automatically by
-// ToBytes, so they do not need to be initialized manually.
+// SerializeTo, so they do not need to be initialized manually.
 func NewDataLink() *DataLink {
 	return &DataLink{}
 }
@@ -28,7 +28,7 @@ func NewDataLink() *DataLink {
 func NewDataLinkFromBytes(data []byte) (*DataLink, error) {
 	dataLink := &DataLink{}
 
-	err := dataLink.FromBytes(data)
+	err := dataLink.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func NewDataLinkFromBytes(data []byte) (*DataLink, error) {
 	return dataLink, nil
 }
 
-func (dl *DataLink) FromBytes(data []byte) error {
+func (dl *DataLink) DecodeFromBytes(data []byte) error {
 	if data[0] != 0x05 || data[1] != 0x64 {
 		return fmt.Errorf(
 			"first 2 bytes %#X don't match the magic bytes (0x0564)", data[:2])
@@ -64,7 +64,7 @@ func (dl *DataLink) FromBytes(data []byte) error {
 	return nil
 }
 
-func (dl *DataLink) ToBytes() ([]byte, error) {
+func (dl *DataLink) SerializeTo() ([]byte, error) {
 	var out []byte
 
 	// Set SYN bytes (in case we initialized an empty packet)

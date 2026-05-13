@@ -13,8 +13,8 @@ type Point2Bits struct {
 
 func (p *Point2Bits) DataType() PointDataType { return PointDataType2Bits }
 
-// FromBytes should not be used directly.
-func (p *Point2Bits) FromBytes(data []byte, prefSize int) error {
+// DecodeFromBytes should not be used directly.
+func (p *Point2Bits) DecodeFromBytes(data []byte, prefSize int) error {
 	if len(data) > 1 {
 		return errors.New("can't construct 2 bit point from multiple bytes")
 	} else if prefSize != 0 {
@@ -29,8 +29,8 @@ func (p *Point2Bits) FromBytes(data []byte, prefSize int) error {
 	return nil
 }
 
-// ToBytes should not be used directly.
-func (p *Point2Bits) ToBytes() ([]byte, error) {
+// SerializeTo should not be used directly.
+func (p *Point2Bits) SerializeTo() ([]byte, error) {
 	var packedValue byte
 	if p.Value[0] {
 		packedValue += 0b00000001

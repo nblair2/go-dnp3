@@ -11,18 +11,31 @@ import (
 	"math"
 
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )
 
 type Frame struct {
 	DataLink    DataLink    `json:"data_link"`
 	Transport   Transport   `json:"transport"`
 	Application Application `json:"application"`
+
+	// contents caches the on-wire bytes captured during DecodeFromBytes so
+	// LayerContents can return them without re-encoding.
+	contents []byte `json:"-"`
 }
 
-// NewFrame returns a new Frame ready to be populated via FromBytes or by
+// Compile-time interface assertions for gopacket compliance.
+var (
+	_ gopacket.Layer             = (*Frame)(nil)
+	_ gopacket.DecodingLayer     = (*Frame)(nil)
+	_ gopacket.SerializableLayer = (*Frame)(nil)
+	_ gopacket.ApplicationLayer  = (*Frame)(nil)
+)
+
+// NewFrame returns a new Frame ready to be populated via DecodeFromBytes or by
 // setting fields directly. The Application field is nil until populated; it is
 // set automatically to the appropriate type (ApplicationRequest or
-// ApplicationResponse) when FromBytes is called.
+// ApplicationResponse) when DecodeFromBytes is called.
 func NewFrame() *Frame {
 	return &Frame{}
 }
@@ -31,7 +44,7 @@ func NewFrame() *Frame {
 func NewFrameFromBytes(data []byte) (*Frame, error) {
 	frame := &Frame{}
 
-	err := frame.FromBytes(data)
+	err := frame.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
 	if err != nil {
 		return nil, err
 	}
@@ -99,125 +112,115 @@ var LayerTypeDNP3 = gopacket.RegisterLayerType(20000,
 	},
 )
 
+// init registers DNP3 as the auto-decoder for TCP and UDP port 20000, the
+// well-known DNP3-over-IP port per IEEE-1815-2012. With this in place,
+// gopacket.NewPacket will surface a *dnp3.Frame layer automatically for
+// matching packets.
+//
+//nolint:gochecknoinits // gopacket port registration must run at package init so stream parsers auto-decode DNP3.
+func init() {
+	layers.RegisterTCPPortLayerType(20000, LayerTypeDNP3)
+	layers.RegisterUDPPortLayerType(20000, LayerTypeDNP3)
+}
+
 // LayerType returns the gopacket layer type for DNP3 (required by gopacket).
 func (*Frame) LayerType() gopacket.LayerType {
 	return LayerTypeDNP3
 }
 
-// LayerContents returns all DNP3 layer bytes (required by gopacket).
+// LayerContents returns the on-wire bytes captured during DecodeFromBytes.
+// Returns nil for frames built manually (use SerializeTo to encode those).
 func (dnp *Frame) LayerContents() []byte {
-	encodedPacket, err := dnp.ToBytes()
-	if err != nil {
-		fmt.Printf("error encoding DNP3: %v\n", err)
-
-		return nil
-	}
-
-	return encodedPacket
+	return dnp.contents
 }
 
-// LayerPayload returns the DNP3 application object bytes (required by gopacket).
-func (dnp *Frame) LayerPayload() []byte {
-	applicationPayload, err := dnp.Application.ToBytes()
-	if err != nil {
-		fmt.Printf("error encoding DNP3 application: %v\n", err)
-
-		return nil
-	}
-
-	return applicationPayload
+// LayerPayload returns nil. DNP3 is a terminal application-layer protocol;
+// nothing is nested inside it from gopacket's perspective. Use the
+// Application accessor to reach into protocol-internal application data.
+func (*Frame) LayerPayload() []byte {
+	return nil
 }
 
-// helper to bridge gopacket and FromBytes.
+// Payload implements gopacket.ApplicationLayer. DNP3 is the terminal
+// application protocol, so it returns nil.
+func (*Frame) Payload() []byte {
+	return nil
+}
+
+// CanDecode implements gopacket.DecodingLayer.
+//
+//nolint:ireturn // gopacket.DecodingLayer.CanDecode requires returning the LayerClass interface.
+func (*Frame) CanDecode() gopacket.LayerClass {
+	return LayerTypeDNP3
+}
+
+// NextLayerType implements gopacket.DecodingLayer. DNP3 is terminal.
+func (*Frame) NextLayerType() gopacket.LayerType {
+	return gopacket.LayerTypeZero
+}
+
+// helper to bridge gopacket and DecodeFromBytes.
 func decodeDNP3(data []byte, builder gopacket.PacketBuilder) error {
-	var decoded Frame
+	decoded := &Frame{}
 
-	err := decoded.FromBytes(data)
+	err := decoded.DecodeFromBytes(data, builder)
 	if err != nil {
 		return fmt.Errorf("decoding DNP3 from bytes: %w", err)
 	}
 
-	builder.AddLayer(&decoded)
+	builder.AddLayer(decoded)
+	builder.SetApplicationLayer(decoded)
 
 	return nil
 }
 
-// FromBytes creates a DNP3 object with appropriate layers based on the
-// bytes slice passed to it. Needs at least 10 bytes.
-func (dnp *Frame) FromBytes(data []byte) error {
-	var (
-		err   error
-		clean []byte
-	)
-
-	if len(data) < 10 {
-		return fmt.Errorf("not DNP3, only got %d bytes (need at least 10)",
-			len(data))
+// DecodeFromBytes parses a DNP3 frame from data, populating dnp. It implements
+// gopacket.DecodingLayer. If data is shorter than the frame's declared wire
+// size, df.SetTruncated() is called before the error is returned.
+func (dnp *Frame) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
+	total, err := dnp.checkFrameBounds(data, df)
+	if err != nil {
+		return err
 	}
 
-	err = dnp.DataLink.FromBytes(data[:10])
+	// Cache only the frame's wire-size slice so concatenated frames don't
+	// leak into LayerContents.
+	dnp.contents = append([]byte(nil), data[:total]...)
+
+	err = dnp.DataLink.DecodeFromBytes(data[:10])
 	if err != nil {
 		return fmt.Errorf("error in DNP3 DataLink layer: %w", err)
 	}
 
 	// No transport or application
-	if len(data) == 10 {
+	if total == 10 {
 		return nil
 	}
 
-	// Make transport and remove CRCs. Slice to the frame boundary so a second
-	// frame in the same buffer cannot corrupt CRC validation.
-	payloadLen := int(dnp.DataLink.Length) - 5
-	numBlocks := (payloadLen + 15) / 16
-	framePayloadBytes := payloadLen + numBlocks*2
-
-	transportData := data[10:]
-	if payloadLen > 0 && len(transportData) > framePayloadBytes {
-		transportData = transportData[:framePayloadBytes]
-	}
-
-	clean, err = dnp.Transport.FromBytes(transportData)
-	if err != nil {
-		return fmt.Errorf("error in DNP3 Transport layer: %w", err)
-	}
-
-	// No application?
-	if len(clean) == 0 {
-		return nil
-	}
-
-	if dnp.DataLink.Control.Direction {
-		dnp.Application = &ApplicationRequest{}
-	} else {
-		dnp.Application = &ApplicationResponse{}
-	}
-
-	err = dnp.Application.FromBytes(clean)
-	if err != nil {
-		return fmt.Errorf("error in DNP3 Application layer: %w", err)
-	}
-
-	return nil
+	return dnp.decodeTransportAndApplication(data[10:total])
 }
 
-// ToBytes assembles the DNP3 packet as bytes, in order. It also performs some
-// updates to ensure the SYN, LEN, and CRCs are set correctly based on the
-// current data.
-func (dnp *Frame) ToBytes() ([]byte, error) {
+// SerializeTo implements gopacket.SerializableLayer. It assembles the DNP3
+// packet (DataLink + Transport + Application), recomputes DataLink.Length
+// from the payload, inserts the per-block DNP3 CRCs, and prepends the result
+// onto b. DNP3 CRCs are mandatory by protocol; opts.ComputeChecksums=false is
+// ignored. opts.FixLengths is honored implicitly since the length is always
+// recomputed from the current payload.
+func (dnp *Frame) SerializeTo(buf gopacket.SerializeBuffer, _ gopacket.SerializeOptions) error {
 	var transportApplication []byte
 
 	// get these first, for LEN in DL
 	transportByte, err := dnp.Transport.ToByte()
 	if err != nil {
-		return nil, fmt.Errorf("error encoding transport header: %w", err)
+		return fmt.Errorf("error encoding transport header: %w", err)
 	}
 
 	transportApplication = append(transportApplication, transportByte)
 	// Application isn't always set
 	if dnp.Application != nil {
-		applicationBytes, err := dnp.Application.ToBytes()
+		applicationBytes, err := dnp.Application.SerializeTo()
 		if err != nil {
-			return transportApplication, fmt.Errorf("error encoding application data: %w", err)
+			return fmt.Errorf("error encoding application data: %w", err)
 		}
 
 		transportApplication = append(transportApplication, applicationBytes...)
@@ -228,7 +231,7 @@ func (dnp *Frame) ToBytes() ([]byte, error) {
 	totalLength := payloadLength + 5
 
 	if totalLength > math.MaxUint16 {
-		return nil, fmt.Errorf("transport/application payload too large: %d bytes", payloadLength)
+		return fmt.Errorf("transport/application payload too large: %d bytes", payloadLength)
 	}
 
 	// #nosec G115 -- guarded by range check above
@@ -236,12 +239,20 @@ func (dnp *Frame) ToBytes() ([]byte, error) {
 
 	transportApplication = InsertDNP3CRCs(transportApplication)
 
-	dlBytes, err := dnp.DataLink.ToBytes()
+	dlBytes, err := dnp.DataLink.SerializeTo()
 	if err != nil {
-		return nil, fmt.Errorf("error encoding data link: %w", err)
+		return fmt.Errorf("error encoding data link: %w", err)
 	}
 
-	return append(dlBytes, transportApplication...), nil
+	dst, err := buf.PrependBytes(len(dlBytes) + len(transportApplication))
+	if err != nil {
+		return fmt.Errorf("prepending DNP3 bytes: %w", err)
+	}
+
+	copy(dst, dlBytes)
+	copy(dst[len(dlBytes):], transportApplication)
+
+	return nil
 }
 
 // String outputs the DNP3 packet as an indented string.
@@ -255,4 +266,67 @@ func (dnp *Frame) String() string {
 		indent(dnp.DataLink.String(), "\t"),
 		indent(dnp.Transport.String(), "\t"),
 		appString)
+}
+
+// checkFrameBounds validates that data contains a complete DNP3 frame and
+// returns its total wire size. Calls df.SetTruncated() when data is short.
+func (*Frame) checkFrameBounds(data []byte, feedback gopacket.DecodeFeedback) (int, error) {
+	if len(data) < 10 {
+		feedback.SetTruncated()
+
+		return 0, fmt.Errorf("not DNP3, only got %d bytes (need at least 10)",
+			len(data))
+	}
+
+	total := frameWireSize(data[2])
+	if total == 0 {
+		return 0, fmt.Errorf("invalid DNP3 length byte: %d", data[2])
+	}
+
+	if len(data) < total {
+		feedback.SetTruncated()
+
+		return 0, fmt.Errorf("truncated DNP3 frame: have %d bytes, need %d",
+			len(data), total)
+	}
+
+	return total, nil
+}
+
+// decodeTransportAndApplication parses the post-header portion of a frame.
+// data must already be sliced to a single frame's wire bytes (excluding the
+// 10-byte DataLink header).
+func (dnp *Frame) decodeTransportAndApplication(data []byte) error {
+	// Slice transport bytes to the payload boundary so a second frame in the
+	// same buffer cannot corrupt CRC validation.
+	payloadLen := int(dnp.DataLink.Length) - 5
+	numBlocks := (payloadLen + 15) / 16
+	framePayloadBytes := payloadLen + numBlocks*2
+
+	transportData := data
+	if payloadLen > 0 && len(transportData) > framePayloadBytes {
+		transportData = transportData[:framePayloadBytes]
+	}
+
+	clean, err := dnp.Transport.DecodeFromBytes(transportData)
+	if err != nil {
+		return fmt.Errorf("error in DNP3 Transport layer: %w", err)
+	}
+
+	if len(clean) == 0 {
+		return nil
+	}
+
+	if dnp.DataLink.Control.Direction {
+		dnp.Application = &ApplicationRequest{}
+	} else {
+		dnp.Application = &ApplicationResponse{}
+	}
+
+	err = dnp.Application.DecodeFromBytes(clean)
+	if err != nil {
+		return fmt.Errorf("error in DNP3 Application layer: %w", err)
+	}
+
+	return nil
 }

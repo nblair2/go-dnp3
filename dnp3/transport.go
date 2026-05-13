@@ -14,7 +14,7 @@ type Transport struct {
 	Checksums [][]byte `json:"checksums"`
 }
 
-// NewTransport returns a new Transport ready to be populated via FromBytes or
+// NewTransport returns a new Transport ready to be populated via DecodeFromBytes or
 // by setting fields directly. All fields default to their zero values, which
 // are valid starting points for both parsing and manual construction.
 func NewTransport() *Transport {
@@ -26,7 +26,7 @@ func NewTransport() *Transport {
 func NewTransportFromBytes(data []byte) (*Transport, []byte, error) {
 	trans := &Transport{}
 
-	clean, err := trans.FromBytes(data)
+	clean, err := trans.DecodeFromBytes(data)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -34,7 +34,7 @@ func NewTransportFromBytes(data []byte) (*Transport, []byte, error) {
 	return trans, clean, nil
 }
 
-func (trans *Transport) FromBytes(data []byte) ([]byte, error) {
+func (trans *Transport) DecodeFromBytes(data []byte) ([]byte, error) {
 	crcs, clean, err := RemoveDNP3CRCs(data)
 	if err != nil {
 		return nil, fmt.Errorf("can't remove crcs: %w", err)

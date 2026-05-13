@@ -120,9 +120,6 @@ linters:
       # Never
       - linters:
           - forbidigo
-        path: dnp3/dnp3.go
-      - linters:
-          - forbidigo
         path: dnp3/dnp3_test.go
       - linters:
           - godox

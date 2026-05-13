@@ -31,8 +31,8 @@ const (
 )
 
 type RangeField interface {
-	ToBytes() ([]byte, error)
-	FromBytes(data []byte) error
+	SerializeTo() ([]byte, error)
+	DecodeFromBytes(data []byte) error
 	String() string
 	NumObjects() int
 	Size() int
@@ -91,7 +91,7 @@ type StartStopRangeField struct {
 	code      RangeSpecCode
 }
 
-func (rf *StartStopRangeField) ToBytes() ([]byte, error) {
+func (rf *StartStopRangeField) SerializeTo() ([]byte, error) {
 	var encoded []byte
 
 	switch rf.byteWidth {
@@ -126,7 +126,7 @@ func (rf *StartStopRangeField) ToBytes() ([]byte, error) {
 	return encoded, nil
 }
 
-func (rf *StartStopRangeField) FromBytes(data []byte) error {
+func (rf *StartStopRangeField) DecodeFromBytes(data []byte) error {
 	expected := rf.byteWidth * 2
 	if len(data) != expected {
 		return fmt.Errorf("requires %d bytes, got %d", expected, len(data))
@@ -186,7 +186,7 @@ type CountRangeField struct {
 	code      RangeSpecCode
 }
 
-func (rf *CountRangeField) ToBytes() ([]byte, error) {
+func (rf *CountRangeField) SerializeTo() ([]byte, error) {
 	var encoded []byte
 
 	switch rf.byteWidth {
@@ -211,7 +211,7 @@ func (rf *CountRangeField) ToBytes() ([]byte, error) {
 	return encoded, nil
 }
 
-func (rf *CountRangeField) FromBytes(data []byte) error {
+func (rf *CountRangeField) DecodeFromBytes(data []byte) error {
 	if len(data) != rf.byteWidth {
 		return fmt.Errorf("requires %d byte(s), got %d", rf.byteWidth, len(data))
 	}
@@ -258,11 +258,11 @@ func (rf *CountRangeField) Code() RangeSpecCode { return rf.code }
 // AllRangeField represents range spec code 6: no range data, implies all values.
 type AllRangeField struct{}
 
-func (rf *AllRangeField) ToBytes() ([]byte, error) {
+func (rf *AllRangeField) SerializeTo() ([]byte, error) {
 	return nil, nil
 }
 
-func (rf *AllRangeField) FromBytes(data []byte) error {
+func (rf *AllRangeField) DecodeFromBytes(data []byte) error {
 	if len(data) > 0 {
 		return errors.New("AllRangeField is an empty range field")
 	}

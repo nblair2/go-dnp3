@@ -120,7 +120,7 @@ func TestDNP3(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			testFromBytesToBytesStringMarshal(t, tc.input)
+			testRoundTrip(t, tc.input)
 		})
 	}
 }
@@ -149,25 +149,45 @@ func TestCustomPcaps(t *testing.T) {
 			for pkt := range pcap.Packets() {
 				packetIndex++
 
-				tcpLayer := pkt.Layer(layers.LayerTypeTCP)
-				if tcpLayer != nil {
+				var input []byte
+				// Prefer the auto-decoded DNP3 layer (via TCP/UDP port 20000
+				// registration). Fall back to raw TCP payload for non-standard
+				// ports or multi-frame segments.
+				if dnp3Layer := pkt.Layer(dnp3.LayerTypeDNP3); dnp3Layer != nil {
+					input = dnp3Layer.LayerContents()
+				} else if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
 					tcp, _ := tcpLayer.(*layers.TCP)
-
-					input := tcp.Payload
-					if len(input) < 10 {
-						continue
-					}
-
-					t.Run(fmt.Sprintf("Packet%d", packetIndex), func(t *testing.T) {
-						testFromBytesToBytesStringMarshal(t, input)
-					})
+					input = tcp.Payload
 				}
+
+				if len(input) < 10 {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("Packet%d", packetIndex), func(t *testing.T) {
+					testRoundTrip(t, input)
+				})
 			}
 		})
 	}
 }
 
-func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
+// serializeFrame is a test helper that runs a frame through
+// gopacket.SerializeLayers and returns the resulting bytes.
+func serializeFrame(t *testing.T, frame *dnp3.Frame) []byte {
+	t.Helper()
+
+	buf := gopacket.NewSerializeBuffer()
+
+	err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{}, frame)
+	if err != nil {
+		t.Fatal("SerializeLayers:", err)
+	}
+
+	return buf.Bytes()
+}
+
+func testRoundTrip(t *testing.T, input []byte) {
 	t.Helper()
 
 	packet, err := dnp3.NewFrameFromBytes(input)
@@ -184,10 +204,7 @@ func testFromBytesToBytesStringMarshal(t *testing.T, input []byte) {
 		}
 	}
 
-	output, err := packet.ToBytes()
-	if err != nil {
-		t.Fatal("ToBytes:", err)
-	}
+	output := serializeFrame(t, packet)
 
 	if !slices.Equal(input, output) {
 		t.Fatal("Input and Output not equal")
@@ -331,10 +348,10 @@ func TestParseFrames_partialBody(t *testing.T) {
 	}
 }
 
-// TestFromBytes_concatenatedFrames is a regression test for the CRC-corruption
+// TestDecode_concatenatedFrames is a regression test for the CRC-corruption
 // bug: passing two frames in one buffer must not corrupt the first frame's CRC
 // validation.
-func TestFromBytes_concatenatedFrames(t *testing.T) {
+func TestDecode_concatenatedFrames(t *testing.T) {
 	t.Parallel()
 
 	// Two valid frames concatenated in a single buffer.
@@ -342,14 +359,11 @@ func TestFromBytes_concatenatedFrames(t *testing.T) {
 
 	frame, err := dnp3.NewFrameFromBytes(buf)
 	if err != nil {
-		t.Fatalf("FromBytes failed on concatenated buffer: %v", err)
+		t.Fatalf("DecodeFromBytes failed on concatenated buffer: %v", err)
 	}
 
 	// Re-encode and compare only the first frame's bytes.
-	got, err := frame.ToBytes()
-	if err != nil {
-		t.Fatal(err)
-	}
+	got := serializeFrame(t, frame)
 
 	if !slices.Equal(got, readBinaryInputChange) {
 		t.Fatalf("re-encoded frame mismatch\nwant: %x\n got: %x", readBinaryInputChange, got)
@@ -379,13 +393,150 @@ func TestApplicationData_GetSetExtra(t *testing.T) {
 		t.Fatalf("GetExtra returned %x, want %x", appData.GetExtra(), extra)
 	}
 
-	// ToBytes should include the extra bytes in output.
-	out, err := appData.ToBytes()
+	// SerializeTo should include the extra bytes in output.
+	out, err := appData.SerializeTo()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if !slices.Equal(out, extra) {
-		t.Fatalf("ToBytes returned %x, want %x", out, extra)
+		t.Fatalf("SerializeTo returned %x, want %x", out, extra)
+	}
+}
+
+// truncFeedback captures gopacket.DecodeFeedback.SetTruncated calls.
+type truncFeedback struct {
+	truncated bool
+}
+
+func (tf *truncFeedback) SetTruncated() { tf.truncated = true }
+
+// TestDecodingLayer exercises Frame's gopacket.DecodingLayer surface: it
+// verifies CanDecode, NextLayerType, LayerContents (cached on-wire bytes),
+// LayerPayload (nil), and Payload (nil).
+func TestDecodingLayer(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var frame dnp3.Frame
+
+			err := frame.DecodeFromBytes(testCase.input, gopacket.NilDecodeFeedback)
+			if err != nil {
+				t.Fatal("DecodeFromBytes:", err)
+			}
+
+			if got := frame.CanDecode(); got != dnp3.LayerTypeDNP3 {
+				t.Fatalf("CanDecode = %v, want %v", got, dnp3.LayerTypeDNP3)
+			}
+
+			if got := frame.NextLayerType(); got != gopacket.LayerTypeZero {
+				t.Fatalf("NextLayerType = %v, want %v", got, gopacket.LayerTypeZero)
+			}
+
+			if got := frame.LayerContents(); !slices.Equal(got, testCase.input) {
+				t.Fatalf("LayerContents mismatch\ngot:  %x\nwant: %x", got, testCase.input)
+			}
+
+			if got := frame.LayerPayload(); got != nil {
+				t.Fatalf("LayerPayload should be nil, got %d bytes", len(got))
+			}
+
+			if got := frame.Payload(); got != nil {
+				t.Fatalf("Payload should be nil, got %d bytes", len(got))
+			}
+		})
+	}
+}
+
+// TestDecodingLayer_truncated verifies DecodeFromBytes calls
+// DecodeFeedback.SetTruncated when input is shorter than the frame's wire size.
+func TestDecodingLayer_truncated(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		data []byte
+	}{
+		{"shorter than header", []byte{0x05, 0x64, 0x14}},
+		{"header but truncated body", readClass1230[:15]},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			feedback := &truncFeedback{}
+
+			var frame dnp3.Frame
+
+			err := frame.DecodeFromBytes(testCase.data, feedback)
+			if err == nil {
+				t.Fatal("expected error on truncated input")
+			}
+
+			if !feedback.truncated {
+				t.Fatal("SetTruncated was not called")
+			}
+		})
+	}
+}
+
+// TestNewPacket_appLayer verifies gopacket.NewPacket surfaces the DNP3 frame
+// as both pkt.Layer(LayerTypeDNP3) and pkt.ApplicationLayer().
+func TestNewPacket_appLayer(t *testing.T) {
+	t.Parallel()
+
+	pkt := gopacket.NewPacket(readBinaryInputChange, dnp3.LayerTypeDNP3, gopacket.Default)
+	if errLayer := pkt.ErrorLayer(); errLayer != nil {
+		t.Fatalf("decode error: %v", errLayer.Error())
+	}
+
+	layer := pkt.Layer(dnp3.LayerTypeDNP3)
+	if layer == nil {
+		t.Fatal("DNP3 layer not found in packet")
+	}
+
+	frame, ok := layer.(*dnp3.Frame)
+	if !ok {
+		t.Fatalf("layer is not *dnp3.Frame, got %T", layer)
+	}
+
+	if !slices.Equal(frame.LayerContents(), readBinaryInputChange) {
+		t.Fatal("LayerContents mismatch")
+	}
+
+	appLayer := pkt.ApplicationLayer()
+	if appLayer == nil {
+		t.Fatal("ApplicationLayer is nil")
+	}
+
+	if appLayer.LayerType() != dnp3.LayerTypeDNP3 {
+		t.Fatalf("ApplicationLayer type = %v, want %v", appLayer.LayerType(), dnp3.LayerTypeDNP3)
+	}
+}
+
+// TestSerializeLayers verifies that running each test-case frame through
+// gopacket.SerializeLayers reproduces the original bytes exactly.
+func TestSerializeLayers(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			frame, err := dnp3.NewFrameFromBytes(testCase.input)
+			if err != nil {
+				t.Fatal("NewFrameFromBytes:", err)
+			}
+
+			got := serializeFrame(t, frame)
+
+			if !slices.Equal(got, testCase.input) {
+				t.Fatalf("round-trip mismatch\ngot:  %x\nwant: %x", got, testCase.input)
+			}
+		})
 	}
 }

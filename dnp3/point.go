@@ -8,8 +8,8 @@ import (
 
 // Point is the interface implemented by all DNP3 point types.
 type Point interface {
-	FromBytes(data []byte, prefSize int) error
-	ToBytes() ([]byte, error)
+	DecodeFromBytes(data []byte, prefSize int) error
+	SerializeTo() ([]byte, error)
 	String() string
 	Fields() PointFields
 	DataType() PointDataType
@@ -257,7 +257,7 @@ func packPointsBytes(points []Point) ([]byte, error) {
 	var encoded []byte
 
 	for _, point := range points {
-		b, err := point.ToBytes()
+		b, err := point.SerializeTo()
 		if err != nil {
 			return nil, fmt.Errorf("error packing points: %w", err)
 		}
