@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/nblair2/go-dnp3/compare/v1.2.0...v2.0.0) (2026-05-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* FromBytes / ToBytes --> DecodeFromBytes / SerializeTo
+
+### Features
+
+* gopacket compliance ([#25](https://github.com/nblair2/go-dnp3/issues/25)) ([59d4f97](https://github.com/nblair2/go-dnp3/commit/59d4f97f17f2ab782ce9105ba8041c6fbd509182))
+* multi-frame parsing, extra accessors ([#22](https://github.com/nblair2/go-dnp3/issues/22)) ([ec3d6bd](https://github.com/nblair2/go-dnp3/commit/ec3d6bd28e7816b4cc78132edf0733f0f2be6c96))
+
 ## [1.2.0](https://github.com/nblair2/go-dnp3/compare/v1.1.0...v1.2.0) (2026-05-09)
 
 
