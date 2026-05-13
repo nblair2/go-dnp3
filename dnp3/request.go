@@ -12,7 +12,7 @@ type ApplicationRequest struct {
 }
 
 // NewApplicationRequest returns a new ApplicationRequest ready to be populated
-// via FromBytes or by setting fields directly. All fields default to their zero
+// via DecodeFromBytes or by setting fields directly. All fields default to their zero
 // values, which are valid starting points for both parsing and manual construction.
 func NewApplicationRequest() *ApplicationRequest {
 	return &ApplicationRequest{}
@@ -23,7 +23,7 @@ func NewApplicationRequest() *ApplicationRequest {
 func NewApplicationRequestFromBytes(data []byte) (*ApplicationRequest, error) {
 	request := &ApplicationRequest{}
 
-	err := request.FromBytes(data)
+	err := request.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -31,20 +31,20 @@ func NewApplicationRequestFromBytes(data []byte) (*ApplicationRequest, error) {
 	return request, nil
 }
 
-func (appreq *ApplicationRequest) FromBytes(data []byte) error {
+func (appreq *ApplicationRequest) DecodeFromBytes(data []byte) error {
 	appreq.Control.FromByte(data[0])
 
 	appreq.FunctionCode = RequestFunctionCode(data[1])
 
-	err := appreq.Data.FromBytes(data[2:])
+	err := appreq.Data.DecodeFromBytes(data[2:])
 	if err != nil {
-		return fmt.Errorf("couldn't create AppReq Data FromBytes: %w", err)
+		return fmt.Errorf("couldn't create AppReq Data DecodeFromBytes: %w", err)
 	}
 
 	return nil
 }
 
-func (appreq *ApplicationRequest) ToBytes() ([]byte, error) {
+func (appreq *ApplicationRequest) SerializeTo() ([]byte, error) {
 	var encoded []byte
 
 	ctlByte, err := appreq.Control.ToByte()
@@ -55,9 +55,9 @@ func (appreq *ApplicationRequest) ToBytes() ([]byte, error) {
 	encoded = append(encoded, ctlByte)
 	encoded = append(encoded, byte(appreq.FunctionCode))
 
-	dataBytes, err := appreq.Data.ToBytes()
+	dataBytes, err := appreq.Data.SerializeTo()
 	if err != nil {
-		return encoded, fmt.Errorf("couldn't convert AppReq Data ToBytes: %w", err)
+		return encoded, fmt.Errorf("couldn't convert AppReq Data SerializeTo: %w", err)
 	}
 
 	encoded = append(encoded, dataBytes...)

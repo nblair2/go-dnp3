@@ -6,8 +6,8 @@ import (
 
 // Application - layer abstraction for Request / Response structure.
 type Application interface {
-	FromBytes(data []byte) error
-	ToBytes() ([]byte, error)
+	DecodeFromBytes(data []byte) error
+	SerializeTo() ([]byte, error)
 	String() string
 	GetControl() ApplicationControl
 	SetControl(ctl ApplicationControl)

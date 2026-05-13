@@ -14,7 +14,7 @@ type ApplicationResponse struct {
 }
 
 // NewApplicationResponse returns a new ApplicationResponse ready to be populated
-// via FromBytes or by setting fields directly. All fields default to their zero
+// via DecodeFromBytes or by setting fields directly. All fields default to their zero
 // values, which are valid starting points for both parsing and manual construction.
 func NewApplicationResponse() *ApplicationResponse {
 	return &ApplicationResponse{}
@@ -25,7 +25,7 @@ func NewApplicationResponse() *ApplicationResponse {
 func NewApplicationResponseFromBytes(data []byte) (*ApplicationResponse, error) {
 	response := &ApplicationResponse{}
 
-	err := response.FromBytes(data)
+	err := response.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -33,25 +33,25 @@ func NewApplicationResponseFromBytes(data []byte) (*ApplicationResponse, error) 
 	return response, nil
 }
 
-func (appresp *ApplicationResponse) FromBytes(data []byte) error {
+func (appresp *ApplicationResponse) DecodeFromBytes(data []byte) error {
 	appresp.Control.FromByte(data[0])
 
 	appresp.FunctionCode = ResponseFunctionCode(data[1])
 
-	err := appresp.InternalIndications.FromBytes(data[2:4])
+	err := appresp.InternalIndications.DecodeFromBytes(data[2:4])
 	if err != nil {
 		return fmt.Errorf("can't create application response: %w", err)
 	}
 
-	err = appresp.Data.FromBytes(data[4:])
+	err = appresp.Data.DecodeFromBytes(data[4:])
 	if err != nil {
-		return fmt.Errorf("couldn't create AppReq Data FromBytes: %w", err)
+		return fmt.Errorf("couldn't create AppReq Data DecodeFromBytes: %w", err)
 	}
 
 	return nil
 }
 
-func (appresp *ApplicationResponse) ToBytes() ([]byte, error) {
+func (appresp *ApplicationResponse) SerializeTo() ([]byte, error) {
 	var encoded []byte
 
 	ctlByte, err := appresp.Control.ToByte()
@@ -61,9 +61,9 @@ func (appresp *ApplicationResponse) ToBytes() ([]byte, error) {
 
 	encoded = append(encoded, ctlByte)
 	encoded = append(encoded, byte(appresp.FunctionCode))
-	encoded = append(encoded, appresp.InternalIndications.ToBytes()...)
+	encoded = append(encoded, appresp.InternalIndications.SerializeTo()...)
 
-	dataBytes, err := appresp.Data.ToBytes()
+	dataBytes, err := appresp.Data.SerializeTo()
 	if err != nil {
 		return encoded, fmt.Errorf("error encoding data: %w", err)
 	}
@@ -158,7 +158,7 @@ type ApplicationInternalIndications struct {
 }
 
 // NewApplicationInternalIndications returns a new ApplicationInternalIndications
-// ready to be populated via FromBytes or by setting fields directly.
+// ready to be populated via DecodeFromBytes or by setting fields directly.
 func NewApplicationInternalIndications() *ApplicationInternalIndications {
 	return &ApplicationInternalIndications{}
 }
@@ -170,7 +170,7 @@ func NewApplicationInternalIndicationsFromBytes(
 ) (*ApplicationInternalIndications, error) {
 	appiin := &ApplicationInternalIndications{}
 
-	err := appiin.FromBytes(data)
+	err := appiin.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func NewApplicationInternalIndicationsFromBytes(
 	return appiin, nil
 }
 
-func (appiin *ApplicationInternalIndications) FromBytes(data []byte) error {
+func (appiin *ApplicationInternalIndications) DecodeFromBytes(data []byte) error {
 	if len(data) != 2 {
 		return fmt.Errorf(
 			"ApplicationInternalIndications requires exactly 2 bytes, got %d",
@@ -224,7 +224,7 @@ func boolToBits(bools []bool) byte {
 	return out
 }
 
-func (appiin *ApplicationInternalIndications) ToBytes() []byte {
+func (appiin *ApplicationInternalIndications) SerializeTo() []byte {
 	lsb := boolToBits([]bool{
 		appiin.AllStations,
 		appiin.Class1Events,

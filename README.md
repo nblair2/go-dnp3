@@ -10,12 +10,28 @@
 
 ## Usage
 
-*   **Parsing**: Use `FromBytes([]byte)` to parse raw byte slices into structured DNP3 objects.
-*   **Encoding**: Use `ToBytes()` to serialize structs back into bytes. This automatically handles length calculations and inserts CRCs on the fly.
-*   **Inspection**: Use `String()` to generate human-readable, indented string representations of packets (excluds reserved fields and CRCs).
-*   **Serialization**: Full support for `json.Marshal()` to convert packets into machine-friendly JSON formats.
+`*dnp3.Frame` implements the standard gopacket interfaces (`Layer`, `DecodingLayer`, `SerializableLayer`, `ApplicationLayer`). TCP and UDP port 20000 (DNP3-over-IP) are auto-registered, so `gopacket.NewPacket` decodes DNP3 automatically.
 
-#### See [`example.go`](example.go)
+*   **Parsing**: Use `gopacket.NewPacket(data, dnp3.LayerTypeDNP3, gopacket.Default)`, or `dnp3.NewFrameFromBytes(data)` for raw frame bytes, or `frame.DecodeFromBytes(data, df)` to drive `gopacket.DecodingLayerParser`.
+*   **Encoding**: Use `gopacket.SerializeLayers(buf, opts, frame)`. `Frame.SerializeTo` recomputes `DataLink.Length` and inserts DNP3 CRCs on the fly.
+*   **Stream parsing**: Use `dnp3.ParseFrames(data)` to consume multiple DNP3 frames out of a single TCP read (handles partial trailing frames).
+*   **Inspection**: Use `String()` for a human-readable, indented packet dump (excludes reserved fields and CRCs).
+*   **Serialization**: Full support for `json.Marshal()` to convert packets into machine-friendly JSON.
+
+### Example
+
+```go
+// Auto-decode (NewPacket dispatches on LayerTypeDNP3 directly, or on TCP/UDP port 20000 in a pcap):
+pkt := gopacket.NewPacket(input, dnp3.LayerTypeDNP3, gopacket.Default)
+frame := pkt.Layer(dnp3.LayerTypeDNP3).(*dnp3.Frame)
+
+// Build outbound:
+buf := gopacket.NewSerializeBuffer()
+gopacket.SerializeLayers(buf, gopacket.SerializeOptions{}, frame)
+wire := buf.Bytes()
+```
+
+See [`example.go`](example.go) for a full end-to-end demo, including in-place point mutation and round-tripping.
 
 ## Development
 

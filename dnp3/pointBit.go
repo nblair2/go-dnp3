@@ -22,8 +22,8 @@ type PointBit struct {
 
 func (p *PointBit) DataType() PointDataType { return PointDataTypeBit }
 
-// FromBytes should not be used directly for packed (non-flags) points.
-func (p *PointBit) FromBytes(data []byte, prefSize int) error {
+// DecodeFromBytes should not be used directly for packed (non-flags) points.
+func (p *PointBit) DecodeFromBytes(data []byte, prefSize int) error {
 	if p.hasFlags {
 		return p.fromBytesFlags(data, prefSize)
 	}
@@ -39,8 +39,8 @@ func (p *PointBit) FromBytes(data []byte, prefSize int) error {
 	return nil
 }
 
-// ToBytes should not be used directly for packed (non-flags) points.
-func (p *PointBit) ToBytes() ([]byte, error) {
+// SerializeTo should not be used directly for packed (non-flags) points.
+func (p *PointBit) SerializeTo() ([]byte, error) {
 	if p.hasFlags {
 		return p.toBytesFlags()
 	}
@@ -246,7 +246,7 @@ func newPointsBitFlags(data []byte, num, prefSize int, _ PointPrefixCode) ([]Poi
 	for pointIndex := range num {
 		point := &PointBit{hasFlags: true}
 
-		err := point.FromBytes([]byte{data[pointIndex]}, prefSize)
+		err := point.DecodeFromBytes([]byte{data[pointIndex]}, prefSize)
 		if err != nil {
 			return pointsOut, num, fmt.Errorf("could not decode point: 0x % X, err: %w",
 				data[pointIndex], err)

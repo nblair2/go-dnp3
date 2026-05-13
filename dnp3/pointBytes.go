@@ -68,7 +68,7 @@ type PointBytes struct {
 
 func (p *PointBytes) DataType() PointDataType { return PointDataTypeBytes }
 
-func (p *PointBytes) FromBytes(data []byte, prefSize int) error {
+func (p *PointBytes) DecodeFromBytes(data []byte, prefSize int) error {
 	offset := 0
 
 	if prefSize > 0 {
@@ -95,7 +95,7 @@ func (p *PointBytes) FromBytes(data []byte, prefSize int) error {
 	return nil
 }
 
-func (p *PointBytes) ToBytes() ([]byte, error) {
+func (p *PointBytes) SerializeTo() ([]byte, error) {
 	var output []byte
 
 	indexBytes, err := p.prefixBytes()
@@ -515,7 +515,7 @@ func newPointsBytesGeneric(
 		point := newPoint()
 
 		// Tell the point whether its prefix is an index or a size
-		// BEFORE calling FromBytes, so setPrefixValue routes correctly.
+		// BEFORE calling DecodeFromBytes, so setPrefixValue routes correctly.
 		if slices.Contains([]PointPrefixCode{Size1Octet, Size2Octet, Size4Octet}, prefCode) {
 			point.sizeSize = prefSize
 		}
@@ -524,7 +524,7 @@ func newPointsBytesGeneric(
 		pointDataEnd := (pointIndex + 1) * (width + prefSize)
 		pointData := data[pointDataStart:pointDataEnd]
 
-		err := point.FromBytes(pointData, prefSize)
+		err := point.DecodeFromBytes(pointData, prefSize)
 		if err != nil {
 			return pointsOut, size, fmt.Errorf(
 				"could not decode point: 0x % X, err: %w",

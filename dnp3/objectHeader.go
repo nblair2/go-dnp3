@@ -19,7 +19,7 @@ type ObjectHeader struct {
 	size            int
 }
 
-// NewObjectHeader returns a new ObjectHeader ready to be populated via FromBytes
+// NewObjectHeader returns a new ObjectHeader ready to be populated via DecodeFromBytes
 // or by setting fields directly.
 func NewObjectHeader() *ObjectHeader {
 	return &ObjectHeader{}
@@ -29,7 +29,7 @@ func NewObjectHeader() *ObjectHeader {
 func NewObjectHeaderFromBytes(data []byte) (*ObjectHeader, error) {
 	objHeader := &ObjectHeader{}
 
-	err := objHeader.FromBytes(data)
+	err := objHeader.DecodeFromBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func NewObjectHeaderFromBytes(data []byte) (*ObjectHeader, error) {
 	return objHeader, nil
 }
 
-func (oh *ObjectHeader) FromBytes(data []byte) error {
+func (oh *ObjectHeader) DecodeFromBytes(data []byte) error {
 	if len(data) < 3 {
 		return fmt.Errorf("object headers are at 3 - 11 bytes, got %d", len(data))
 	}
@@ -70,7 +70,7 @@ func (oh *ObjectHeader) FromBytes(data []byte) error {
 		)
 	}
 
-	err = rangeField.FromBytes(data[3:consumed])
+	err = rangeField.DecodeFromBytes(data[3:consumed])
 	if err != nil {
 		return fmt.Errorf("can't create range field: %w", err)
 	}
@@ -85,7 +85,7 @@ func (oh *ObjectHeader) FromBytes(data []byte) error {
 	return nil
 }
 
-func (oh *ObjectHeader) ToBytes() ([]byte, error) {
+func (oh *ObjectHeader) SerializeTo() ([]byte, error) {
 	var encoded []byte
 
 	encoded = append(encoded, oh.Group)
@@ -104,7 +104,7 @@ func (oh *ObjectHeader) ToBytes() ([]byte, error) {
 		return nil, errors.New("range field is nil")
 	}
 
-	rangeBytes, err := oh.RangeField.ToBytes()
+	rangeBytes, err := oh.RangeField.SerializeTo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode range field: %w", err)
 	}
