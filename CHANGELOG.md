@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/nblair2/go-dnp3/compare/v2.0.0...v2.0.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* add v2 suffix in go.mod ([#26](https://github.com/nblair2/go-dnp3/issues/26)) ([f15817d](https://github.com/nblair2/go-dnp3/commit/f15817daa951d117811782821bd7e45aa09b6385))
+
 ## [2.0.0](https://github.com/nblair2/go-dnp3/compare/v1.2.0...v2.0.0) (2026-05-13)
 
 
