@@ -607,3 +607,33 @@ func TestPointPrefixSize_size4Octet(t *testing.T) {
 		t.Fatalf("Size4Octet prefix size = %d, want 4", got)
 	}
 }
+
+// TestSetSequence_max verifies the maximum 4-bit sequence value (15) is
+// accepted and out-of-range values are rejected, for both request and response.
+func TestSetSequence_max(t *testing.T) {
+	t.Parallel()
+
+	req := dnp3.NewApplicationRequest()
+
+	err := req.SetSequence(15)
+	if err != nil {
+		t.Errorf("request SetSequence(15): unexpected error %v", err)
+	}
+
+	err = req.SetSequence(16)
+	if err == nil {
+		t.Error("request SetSequence(16): expected error")
+	}
+
+	resp := dnp3.NewApplicationResponse()
+
+	err = resp.SetSequence(15)
+	if err != nil {
+		t.Errorf("response SetSequence(15): unexpected error %v", err)
+	}
+
+	err = resp.SetSequence(16)
+	if err == nil {
+		t.Error("response SetSequence(16): expected error")
+	}
+}

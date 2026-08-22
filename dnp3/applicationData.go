@@ -196,8 +196,7 @@ func (do *DataObject) SerializeTo() ([]byte, error) {
 		if do.Header.objectType != nil {
 			packer = do.Header.objectType.Packer
 		} else if def, ok := objectTypes[groupVariation{do.Header.Group, do.Header.Variation}]; ok {
-			// Try to look it up if it wasn't set (e.g. manual construction)
-			do.Header.objectType = def
+			// Don't cache on the shared header; may run concurrently.
 			packer = def.Packer
 		}
 

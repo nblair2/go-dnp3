@@ -119,8 +119,7 @@ func (oh *ObjectHeader) String() string {
 	if oh.objectType != nil {
 		desc = oh.objectType.Description
 	} else if def, ok := objectTypes[groupVariation{oh.Group, oh.Variation}]; ok {
-		// Try to look it up if it wasn't set (e.g. manual construction)
-		oh.objectType = def
+		// Don't cache on oh: String may run concurrently.
 		desc = def.Description
 	}
 
