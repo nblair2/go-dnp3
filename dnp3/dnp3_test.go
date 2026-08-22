@@ -570,3 +570,40 @@ func TestDecode_shortInput(t *testing.T) {
 		t.Error("RemoveDNP3CRCs: expected error on truncated trailing block")
 	}
 }
+
+// TestSerialize_headerOnlyFrame verifies a link-control frame (no transport or
+// application layer) round-trips without gaining a spurious transport byte.
+func TestSerialize_headerOnlyFrame(t *testing.T) {
+	t.Parallel()
+
+	frame := dnp3.NewFrame()
+	frame.DataLink.Control.Primary = true
+	frame.DataLink.Control.FunctionCode = dnp3.RequestLinkStatus
+	frame.DataLink.Destination = 4
+	frame.DataLink.Source = 3
+
+	want := serializeFrame(t, frame)
+	if len(want) != 10 {
+		t.Fatalf("header-only frame should serialize to 10 bytes, got %d: %x", len(want), want)
+	}
+
+	decoded, err := dnp3.NewFrameFromBytes(want)
+	if err != nil {
+		t.Fatalf("NewFrameFromBytes: %v", err)
+	}
+
+	got := serializeFrame(t, decoded)
+	if !slices.Equal(got, want) {
+		t.Fatalf("header-only round-trip mismatch\ngot:  %x\nwant: %x", got, want)
+	}
+}
+
+// TestPointPrefixSize_size4Octet verifies the 4-octet size prefix is reported
+// as 4 bytes, per IEEE-1815.
+func TestPointPrefixSize_size4Octet(t *testing.T) {
+	t.Parallel()
+
+	if got := dnp3.Size4Octet.GetPointPrefixSize(); got != 4 {
+		t.Fatalf("Size4Octet prefix size = %d, want 4", got)
+	}
+}

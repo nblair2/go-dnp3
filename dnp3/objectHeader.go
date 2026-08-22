@@ -168,7 +168,7 @@ var PointPrefixCodeSize = map[PointPrefixCode]int{
 	Index4Octet: 4,
 	Size1Octet:  1,
 	Size2Octet:  2,
-	Size4Octet:  3,
+	Size4Octet:  4,
 	Reserved:    0,
 }
 
