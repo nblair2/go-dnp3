@@ -146,6 +146,10 @@ func (rf *StartStopRangeField) DecodeFromBytes(data []byte) error {
 		return fmt.Errorf("invalid byte width %d", rf.byteWidth)
 	}
 
+	if rf.Stop < rf.Start {
+		return fmt.Errorf("stop index %d precedes start index %d", rf.Stop, rf.Start)
+	}
+
 	return nil
 }
 
@@ -163,6 +167,10 @@ func (rf *StartStopRangeField) String() string {
 }
 
 func (rf *StartStopRangeField) NumObjects() int {
+	if rf.Stop < rf.Start {
+		return 0
+	}
+
 	return int(rf.Stop - rf.Start + 1)
 }
 

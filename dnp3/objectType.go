@@ -219,7 +219,7 @@ var objectTypes = map[groupVariation]*objectType{
 	},
 	{23, 2}: {
 		Description: "(Event) Frozen Counter Event - 16-bit with Flag",
-		Constructor: makeBytesConstructor(layoutFlags, 2),
+		Constructor: makeBytesConstructor(layoutFlags, 3),
 		Packer:      packPointsBytes,
 	},
 	{23, 5}: {

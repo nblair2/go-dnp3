@@ -209,21 +209,24 @@ func (dnp *Frame) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error
 func (dnp *Frame) SerializeTo(buf gopacket.SerializeBuffer, _ gopacket.SerializeOptions) error {
 	var transportApplication []byte
 
-	// get these first, for LEN in DL
-	transportByte, err := dnp.Transport.ToByte()
-	if err != nil {
-		return fmt.Errorf("error encoding transport header: %w", err)
-	}
-
-	transportApplication = append(transportApplication, transportByte)
-	// Application isn't always set
-	if dnp.Application != nil {
-		applicationBytes, err := dnp.Application.SerializeTo()
+	if dnp.DataLink.Control.carriesUserData() {
+		// get these first, for LEN in DL
+		transportByte, err := dnp.Transport.ToByte()
 		if err != nil {
-			return fmt.Errorf("error encoding application data: %w", err)
+			return fmt.Errorf("error encoding transport header: %w", err)
 		}
 
-		transportApplication = append(transportApplication, applicationBytes...)
+		transportApplication = append(transportApplication, transportByte)
+
+		// Application isn't always set
+		if dnp.Application != nil {
+			applicationBytes, err := dnp.Application.SerializeTo()
+			if err != nil {
+				return fmt.Errorf("error encoding application data: %w", err)
+			}
+
+			transportApplication = append(transportApplication, applicationBytes...)
+		}
 	}
 	// len is 5 more bytes in DL, excludes CRCs
 

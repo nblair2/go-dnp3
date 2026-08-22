@@ -202,6 +202,14 @@ func (dlctl *DataLinkControl) String() string {
 	)
 }
 
+// carriesUserData reports whether the frame carries transport and application
+// data; only the user-data function codes do.
+func (dlctl *DataLinkControl) carriesUserData() bool {
+	code, ok := dlctl.FunctionCode.(DataLinkPrimaryFunctionCode)
+
+	return ok && (code == ConfirmedUserData || code == UnconfirmedUserData)
+}
+
 type DataLinkFunction interface {
 	fmt.Stringer
 	Byte() byte
