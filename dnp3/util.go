@@ -145,9 +145,15 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 		crcs  [][]byte
 	)
 
-	for i := 0; i < len(data); i += blockSize + crcSize {
-		end := min(i+blockSize+crcSize, len(data))
-		block := data[i : end-crcSize]
+	for offset := 0; offset < len(data); offset += blockSize + crcSize {
+		end := min(offset+blockSize+crcSize, len(data))
+		if end-offset <= crcSize {
+			return nil, nil, fmt.Errorf(
+				"truncated block: %d trailing byte(s) cannot hold data plus a %d-byte CRC",
+				end-offset, crcSize)
+		}
+
+		block := data[offset : end-crcSize]
 		crc := data[end-crcSize : end]
 
 		calc := CalculateDNP3CRC(block)
