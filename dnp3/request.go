@@ -90,7 +90,7 @@ func (appreq *ApplicationRequest) GetSequence() uint8 {
 }
 
 func (appreq *ApplicationRequest) SetSequence(s uint8) error {
-	if s >= 0b00001111 {
+	if s > 0b00001111 {
 		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
 	}
 
