@@ -59,7 +59,7 @@ go test ./dnp3 -args -print
 ```
 
 ### Linting
-[`golangci-lint`](https://golangci-lint.run/) is used for lint and format checking. Run `make lint` to check for errors, and `make fix` to try to automatically fix linting or formatting errors.
+[`prek`](https://prek.j178.dev) runs all checks — [`golangci-lint`](https://golangci-lint.run/) (lint + format), [`codespell`](https://github.com/codespell-project/codespell), workflow linting, and file hygiene hooks — both as git hooks (installed by `make setup`) and via `make lint`, which fixes what it can automatically. See [`prek.toml`](prek.toml) for the hook set.
 
 ## Implementation
 
