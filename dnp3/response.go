@@ -34,6 +34,10 @@ func NewApplicationResponseFromBytes(data []byte) (*ApplicationResponse, error) 
 }
 
 func (appresp *ApplicationResponse) DecodeFromBytes(data []byte) error {
+	if len(data) < 4 {
+		return fmt.Errorf("application response requires at least 4 bytes, got %d", len(data))
+	}
+
 	appresp.Control.FromByte(data[0])
 
 	appresp.FunctionCode = ResponseFunctionCode(data[1])

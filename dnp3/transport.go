@@ -1,6 +1,7 @@
 package dnp3
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -35,6 +36,10 @@ func NewTransportFromBytes(data []byte) (*Transport, []byte, error) {
 }
 
 func (trans *Transport) DecodeFromBytes(data []byte) ([]byte, error) {
+	if len(data) < 1 {
+		return nil, errors.New("transport layer requires at least 1 byte")
+	}
+
 	crcs, clean, err := RemoveDNP3CRCs(data)
 	if err != nil {
 		return nil, fmt.Errorf("can't remove crcs: %w", err)

@@ -540,3 +540,33 @@ func TestSerializeLayers(t *testing.T) {
 		})
 	}
 }
+
+// TestDecode_shortInput verifies the public decoders return an error, rather
+// than panicking, when handed input too short for their fixed-size headers.
+func TestDecode_shortInput(t *testing.T) {
+	t.Parallel()
+
+	_, err := dnp3.NewDataLinkFromBytes([]byte{0x05})
+	if err == nil {
+		t.Error("NewDataLinkFromBytes: expected error on short input")
+	}
+
+	_, _, err = dnp3.NewTransportFromBytes([]byte{})
+	if err == nil {
+		t.Error("NewTransportFromBytes: expected error on empty input")
+	}
+
+	_, err = dnp3.NewApplicationResponseFromBytes([]byte{0x81, 0x00})
+	if err == nil {
+		t.Error("NewApplicationResponseFromBytes: expected error on short input")
+	}
+
+	// A valid 16-byte block plus CRC (18 bytes) followed by a lone trailing
+	// byte leaves a chunk too small to hold a CRC.
+	misaligned := append(dnp3.InsertDNP3CRCs(make([]byte, 16)), 0x00)
+
+	_, _, err = dnp3.RemoveDNP3CRCs(misaligned)
+	if err == nil {
+		t.Error("RemoveDNP3CRCs: expected error on truncated trailing block")
+	}
+}

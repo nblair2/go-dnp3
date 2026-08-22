@@ -37,6 +37,10 @@ func NewDataLinkFromBytes(data []byte) (*DataLink, error) {
 }
 
 func (dl *DataLink) DecodeFromBytes(data []byte) error {
+	if len(data) < 10 {
+		return fmt.Errorf("data link header requires at least 10 bytes, got %d", len(data))
+	}
+
 	if data[0] != 0x05 || data[1] != 0x64 {
 		return fmt.Errorf(
 			"first 2 bytes %#X don't match the magic bytes (0x0564)", data[:2])
