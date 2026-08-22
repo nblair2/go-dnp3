@@ -19,48 +19,30 @@
 *   **Inspection**: Use `String()` for a human-readable, indented packet dump (excludes reserved fields and CRCs).
 *   **Serialization**: Full support for `json.Marshal()` to convert packets into machine-friendly JSON.
 
-### Example
-
-```go
-// Auto-decode (NewPacket dispatches on LayerTypeDNP3 directly, or on TCP/UDP port 20000 in a pcap):
-pkt := gopacket.NewPacket(input, dnp3.LayerTypeDNP3, gopacket.Default)
-frame := pkt.Layer(dnp3.LayerTypeDNP3).(*dnp3.Frame)
-
-// Build outbound:
-buf := gopacket.NewSerializeBuffer()
-gopacket.SerializeLayers(buf, gopacket.SerializeOptions{}, frame)
-wire := buf.Bytes()
-```
-
-See [`example.go`](example.go) for a full end-to-end demo, including in-place point mutation and round-tripping.
-
 ## Development
 
-### Setup
-Run `make setup` to install development tools used by this repository.
+| Target | Description |
+|--------|-------------|
+| `make setup` | Install development tools: `prek`, `stringer`, `libpcap-dev` |
+| `make generate` | Generate code using go generate |
+| `make lint` | Run all prek hooks (lint, spellcheck, format) on all files |
+| `make corpus` | Fetch the pcap test corpus (see test/testdata/corpus.txt) |
+| `make test` | Run tests with generated code |
+| `make clean` | Remove generated files and canary |
 
-### Testing
-> Data for tests is sourced from [opendnp3 conformance reports](https://dnp3.github.io/conformance/report.html)
-
-Run `make test` to run basic tests.
+>  pcap corpus (pinned + checksummed in [`test/testdata/corpus.txt`](test/testdata/corpus.txt),
+> sourced from the CC-BY-4.0 [ITI/ICS-Security-Tools](https://github.com/ITI/ICS-Security-Tools) captures
 
 #### PCAP Testing
-Pass a full PCAP file using the `-args` option `-pcaps=comma.pcap,delimited.pcap,list.pcap`.
+Round-trip ad-hoc PCAP files using the `-pcaps` flag:
 
 ```bash
-go test ./dnp3 -v -args -pcaps=my-custom.pcap
+go test ./test -v -args -pcaps=my-custom.pcap,another.pcap
 ```
 
 #### Printing Strings
-View the string and json outputs of test cases using the `-args` flag `-print-string` and `-print-json`.
+View the string and json outputs of test cases using the `-args` flags `-print-string` and `-print-json`.
 
 ```bash
-go test ./dnp3 -args -print
+go test ./dnp3 -args -print-string -print-json
 ```
-
-### Linting
-[`prek`](https://prek.j178.dev) runs all checks — [`golangci-lint`](https://golangci-lint.run/) (lint + format), [`codespell`](https://github.com/codespell-project/codespell), workflow linting, and file hygiene hooks — both as git hooks (installed by `make setup`) and via `make lint`, which fixes what it can automatically. See [`prek.toml`](prek.toml) for the hook set.
-
-## Implementation
-
-Based on Wireshark's parser and publicly available documents (such as [this validation guide](https://www.dnp.org/Portals/0/Public%20Documents/DNP3%20AN2013-004b%20Validation%20of%20Incoming%20DNP3%20Data.pdf)), as access to the official DNP3 specification is restricted.

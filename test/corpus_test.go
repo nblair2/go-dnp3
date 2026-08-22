@@ -1,0 +1,259 @@
+package corpus_test
+
+import (
+	"flag"
+	"fmt"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"github.com/nblair2/go-dnp3/v2/dnp3"
+)
+
+const (
+	corpusDir      = "testdata/corpus"
+	scoreboardPath = "testdata/corpus_scoreboard.md"
+)
+
+var (
+	// updateScoreboard regenerates the committed corpus scoreboard instead of
+	// comparing against it.
+	updateScoreboard = flag.Bool(
+		"update-scoreboard",
+		false,
+		"rewrite "+scoreboardPath+" from the current parse results",
+	)
+
+	// customPcaps round-trips ad-hoc pcap files without scoreboard comparison.
+	customPcaps = flag.String(
+		"pcaps",
+		"",
+		"comma-separated list of extra pcap files to round-trip",
+	)
+)
+
+// corpusStats are the per-pcap parse results tracked by the scoreboard.
+type corpusStats struct {
+	Payloads  int // non-empty TCP/UDP payloads
+	Frames    int // DNP3 frames parsed
+	Undecoded int // payloads ParseFrames could not fully consume
+}
+
+func (stats corpusStats) String() string {
+	return fmt.Sprintf("payloads=%d frames=%d undecoded=%d",
+		stats.Payloads, stats.Frames, stats.Undecoded)
+}
+
+// TestCorpus round-trips every DNP3 frame in the pcaps fetched by
+// `make corpus`. Re-encoding must be byte-exact for every parsed frame.
+// Per-pcap parse statistics are compared against the committed scoreboard so
+// a parsing-coverage regression fails, while frames using unsupported
+// groups/variations (counted in undecoded) do not.
+func TestCorpus(t *testing.T) {
+	t.Parallel()
+
+	pcapFiles, err := filepath.Glob(filepath.Join(corpusDir, "*.pcap"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pcapFiles) == 0 {
+		t.Skipf("no pcaps in %s; run `make corpus` to fetch them", corpusDir)
+	}
+
+	results := make(map[string]corpusStats, len(pcapFiles))
+
+	for _, path := range pcapFiles {
+		results[filepath.Base(path)] = roundTripPcap(t, path)
+	}
+
+	if *updateScoreboard {
+		writeScoreboard(t, results)
+
+		return
+	}
+
+	compareScoreboard(t, results)
+}
+
+// TestCustomPcaps round-trips any pcap files passed via -pcaps. They are not
+// compared against the scoreboard.
+func TestCustomPcaps(t *testing.T) {
+	t.Parallel()
+
+	if *customPcaps == "" {
+		t.Skip("no pcap files passed via -pcaps")
+	}
+
+	for pcapFile := range strings.SplitSeq(*customPcaps, ",") {
+		pcapFile = strings.TrimSpace(pcapFile)
+		if pcapFile == "" {
+			continue
+		}
+
+		t.Run(filepath.Base(pcapFile), func(t *testing.T) {
+			t.Parallel()
+			t.Log(roundTripPcap(t, pcapFile))
+		})
+	}
+}
+
+// roundTripPcap parses every TCP/UDP payload in the pcap with ParseFrames,
+// re-encodes each frame, and requires the rebuilt bytes to match the
+// original payload exactly.
+func roundTripPcap(t *testing.T, path string) corpusStats {
+	t.Helper()
+
+	handle, err := pcap.OpenOffline(path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	defer handle.Close()
+
+	var stats corpusStats
+
+	packetIndex := 0
+	for pkt := range gopacket.NewPacketSource(handle, handle.LinkType()).Packets() {
+		packetIndex++
+
+		payload := transportPayload(pkt)
+		if len(payload) == 0 {
+			continue
+		}
+
+		stats.Payloads++
+
+		frames, remainder, err := dnp3.ParseFrames(payload)
+		if err != nil {
+			stats.Undecoded++
+		}
+
+		var rebuilt []byte
+
+		for _, frame := range frames {
+			stats.Frames++
+
+			encoded := serializeFrame(t, frame)
+			rebuilt = append(rebuilt, encoded...)
+		}
+
+		rebuilt = append(rebuilt, remainder...)
+		if !slices.Equal(rebuilt, payload) {
+			t.Errorf("%s packet %d: round-trip mismatch\n got: %x\nwant: %x",
+				filepath.Base(path), packetIndex, rebuilt, payload)
+		}
+	}
+
+	return stats
+}
+
+// transportPayload returns the TCP or UDP payload of a packet, or nil.
+func transportPayload(pkt gopacket.Packet) []byte {
+	if tcp, ok := pkt.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
+		return tcp.Payload
+	}
+
+	if udp, ok := pkt.Layer(layers.LayerTypeUDP).(*layers.UDP); ok {
+		return udp.Payload
+	}
+
+	return nil
+}
+
+// serializeFrame runs a frame through gopacket.SerializeLayers and returns
+// the resulting bytes.
+func serializeFrame(t *testing.T, frame *dnp3.Frame) []byte {
+	t.Helper()
+
+	buf := gopacket.NewSerializeBuffer()
+
+	err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{}, frame)
+	if err != nil {
+		t.Fatal("SerializeLayers:", err)
+	}
+
+	return buf.Bytes()
+}
+
+func writeScoreboard(t *testing.T, results map[string]corpusStats) {
+	t.Helper()
+
+	nameWidth := len("pcap")
+	for name := range results {
+		nameWidth = max(nameWidth, len(name))
+	}
+
+	var builder strings.Builder
+
+	builder.WriteString("# DNP3 corpus scoreboard\n\n")
+	builder.WriteString(
+		"Regenerate with `go test ./test -run TestCorpus -args -update-scoreboard`.\n\n")
+	fmt.Fprintf(&builder, "| %-*s | payloads | frames | undecoded |\n", nameWidth, "pcap")
+	fmt.Fprintf(&builder, "| %s | -------: | -----: | --------: |\n",
+		strings.Repeat("-", nameWidth))
+
+	for _, name := range slices.Sorted(maps.Keys(results)) {
+		stats := results[name]
+		fmt.Fprintf(&builder, "| %-*s | %8d | %6d | %9d |\n",
+			nameWidth, name, stats.Payloads, stats.Frames, stats.Undecoded)
+	}
+
+	err := os.WriteFile(scoreboardPath, []byte(builder.String()), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func compareScoreboard(t *testing.T, results map[string]corpusStats) {
+	t.Helper()
+
+	content, err := os.ReadFile(scoreboardPath)
+	if err != nil {
+		t.Fatalf("%v; run `go test ./test -run TestCorpus -args -update-scoreboard`", err)
+	}
+
+	expected := make(map[string]corpusStats, len(results))
+
+	for line := range strings.SplitSeq(string(content), "\n") {
+		var (
+			name  string
+			stats corpusStats
+		)
+
+		// Only table rows with numeric cells match; the header, separator,
+		// and prose lines do not.
+		_, scanErr := fmt.Sscanf(line, "| %s | %d | %d | %d |",
+			&name, &stats.Payloads, &stats.Frames, &stats.Undecoded)
+		if scanErr != nil {
+			continue
+		}
+
+		expected[name] = stats
+	}
+
+	for _, name := range slices.Sorted(maps.Keys(results)) {
+		want, ok := expected[name]
+		if !ok {
+			t.Errorf("%s: missing from scoreboard (re-run with -update-scoreboard)", name)
+
+			continue
+		}
+
+		if results[name] != want {
+			t.Errorf("%s: parse results changed\n got: %s\nwant: %s",
+				name, results[name], want)
+		}
+	}
+
+	for name := range expected {
+		if _, ok := results[name]; !ok {
+			t.Errorf("%s: in scoreboard but not fetched (re-run `make corpus`)", name)
+		}
+	}
+}

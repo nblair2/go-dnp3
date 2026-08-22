@@ -38,7 +38,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - name: Install deps
         run: make install-deps
+      - name: Cache pcap corpus
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: test/testdata/corpus
+          key: corpus-${{ hashFiles('test/testdata/corpus.txt') }}
+      - name: Fetch pcap corpus
+        run: make corpus
       - name: Run tests
         run: make test
-      - name: Run example
-        run: make example

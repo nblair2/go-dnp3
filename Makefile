@@ -1,4 +1,4 @@
-.PHONY: help setup install-deps generate lint spell test example clean
+.PHONY: help setup install-deps generate lint spell corpus test example clean
 
 include .github/versions.env
 
@@ -11,6 +11,7 @@ help:
 	@echo "  generate     - Generate code using go generate"
 	@echo "  lint         - Run all prek hooks (lint, spellcheck, format) on all files"
 	@echo "  spell        - Check for spelling errors in the codebase"
+	@echo "  corpus       - Fetch the pcap test corpus (see test/testdata/corpus.txt)"
 	@echo "  test         - Run tests with generated code"
 	@echo "  example      - Run the example program (example.go)"
 	@echo "  clean        - Remove generated files and canary"
@@ -25,7 +26,7 @@ setup: install-deps
 
 generate: .generated-canary
 
-.generated-canary: $(wildcard *.go dnp3/*.go)
+.generated-canary: $(wildcard *.go dnp3/*.go test/*.go)
 	go generate ./...
 	@touch $@
 
@@ -35,8 +36,19 @@ lint: generate
 spell:
 	prek run codespell --all-files
 
+corpus:
+	@mkdir -p test/testdata/corpus
+	@while read -r name sha url; do \
+		case "$$name" in ''|\#*) continue;; esac; \
+		f="test/testdata/corpus/$$name"; \
+		echo "$$sha  $$f" | sha256sum --check --quiet --status - 2>/dev/null && continue; \
+		echo "fetching $$name"; \
+		curl -sSfL "$$url" -o "$$f" || exit 1; \
+		echo "$$sha  $$f" | sha256sum --check --quiet - || { rm -f "$$f"; exit 1; }; \
+	done < test/testdata/corpus.txt
+
 test: generate
-	go test ./dnp3 -v -args -pcaps=opendnp3_test1.pcap
+	go test -v ./...
 
 example: generate
 	go run .
