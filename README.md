@@ -16,6 +16,7 @@
 *   **Parsing**: Use `gopacket.NewPacket(data, dnp3.LayerTypeDNP3, gopacket.Default)`, or `dnp3.NewFrameFromBytes(data)` for raw frame bytes, or `frame.DecodeFromBytes(data, df)` to drive `gopacket.DecodingLayerParser`.
 *   **Encoding**: Use `gopacket.SerializeLayers(buf, opts, frame)`. `Frame.SerializeTo` recomputes `DataLink.Length` and inserts DNP3 CRCs on the fly.
 *   **Stream parsing**: Use `dnp3.ParseFrames(data)` to consume multiple DNP3 frames out of a single TCP read (handles partial trailing frames).
+*   **Reassembly**: Use `dnp3.Assembler` to rebuild application fragments that span multiple transport segments, tracked per session (source, destination, direction). See `ExampleAssembler`, and `test/stream_test.go` for wiring it up to `gopacket/tcpassembly`.
 *   **Inspection**: Use `String()` for a human-readable, indented packet dump (excludes reserved fields and CRCs).
 *   **Serialization**: Full support for `json.Marshal()` to convert packets into machine-friendly JSON.
 
