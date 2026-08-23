@@ -42,12 +42,14 @@ var (
 type corpusStats struct {
 	Payloads  int // non-empty TCP/UDP payloads
 	Frames    int // DNP3 frames parsed
+	Fragments int // application fragments reassembled
+	Dropped   int // transport segments the assembler could not use
 	Undecoded int // payloads ParseFrames could not fully consume
 }
 
 func (stats corpusStats) String() string {
-	return fmt.Sprintf("payloads=%d frames=%d undecoded=%d",
-		stats.Payloads, stats.Frames, stats.Undecoded)
+	return fmt.Sprintf("payloads=%d frames=%d fragments=%d dropped=%d undecoded=%d",
+		stats.Payloads, stats.Frames, stats.Fragments, stats.Dropped, stats.Undecoded)
 }
 
 // TestCorpus round-trips every DNP3 frame in the pcaps fetched by
@@ -118,6 +120,11 @@ func roundTripPcap(t *testing.T, path string) corpusStats {
 
 	var stats corpusStats
 
+	// Payload remainders are not carried across packets, so a capture that
+	// splits a link frame over two TCP segments loses the segment and counts
+	// toward Dropped.
+	assembler := &dnp3.Assembler{}
+
 	packetIndex := 0
 	for pkt := range gopacket.NewPacketSource(handle, handle.LinkType()).Packets() {
 		packetIndex++
@@ -138,6 +145,17 @@ func roundTripPcap(t *testing.T, path string) corpusStats {
 
 		for _, frame := range frames {
 			stats.Frames++
+
+			fragment, assembleErr := assembler.Assemble(frame)
+
+			// A fragment can complete even when its application layer does
+			// not decode, so check it before the error.
+			switch {
+			case fragment != nil:
+				stats.Fragments++
+			case assembleErr != nil:
+				stats.Dropped++
+			}
 
 			encoded := serializeFrame(t, frame)
 			rebuilt = append(rebuilt, encoded...)
@@ -194,14 +212,19 @@ func writeScoreboard(t *testing.T, results map[string]corpusStats) {
 	builder.WriteString("# DNP3 corpus scoreboard\n\n")
 	builder.WriteString(
 		"Regenerate with `go test ./test -run TestCorpus -args -update-scoreboard`.\n\n")
-	fmt.Fprintf(&builder, "| %-*s | payloads | frames | undecoded |\n", nameWidth, "pcap")
-	fmt.Fprintf(&builder, "| %s | -------: | -----: | --------: |\n",
+	builder.WriteString(
+		"`fragments` are application fragments reassembled by `dnp3.Assembler`;\n" +
+			"`dropped` are transport segments it could not use.\n\n")
+	fmt.Fprintf(&builder, "| %-*s | payloads | frames | fragments | dropped | undecoded |\n",
+		nameWidth, "pcap")
+	fmt.Fprintf(&builder, "| %s | -------: | -----: | --------: | ------: | --------: |\n",
 		strings.Repeat("-", nameWidth))
 
 	for _, name := range slices.Sorted(maps.Keys(results)) {
 		stats := results[name]
-		fmt.Fprintf(&builder, "| %-*s | %8d | %6d | %9d |\n",
-			nameWidth, name, stats.Payloads, stats.Frames, stats.Undecoded)
+		fmt.Fprintf(&builder, "| %-*s | %8d | %6d | %9d | %7d | %9d |\n",
+			nameWidth, name, stats.Payloads, stats.Frames,
+			stats.Fragments, stats.Dropped, stats.Undecoded)
 	}
 
 	err := os.WriteFile(scoreboardPath, []byte(builder.String()), 0o600)
@@ -228,8 +251,9 @@ func compareScoreboard(t *testing.T, results map[string]corpusStats) {
 
 		// Only table rows with numeric cells match; the header, separator,
 		// and prose lines do not.
-		_, scanErr := fmt.Sscanf(line, "| %s | %d | %d | %d |",
-			&name, &stats.Payloads, &stats.Frames, &stats.Undecoded)
+		_, scanErr := fmt.Sscanf(line, "| %s | %d | %d | %d | %d | %d |",
+			&name, &stats.Payloads, &stats.Frames,
+			&stats.Fragments, &stats.Dropped, &stats.Undecoded)
 		if scanErr != nil {
 			continue
 		}

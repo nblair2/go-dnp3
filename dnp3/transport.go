@@ -13,6 +13,11 @@ type Transport struct {
 	First     bool     `json:"first"`
 	Sequence  uint8    `json:"sequence"` // only 6 bits
 	Checksums [][]byte `json:"checksums"`
+
+	// Payload is the segment's application bytes with CRCs removed. For a
+	// segment of a multi-frame fragment this is only a piece of an
+	// application fragment; use an Assembler to reassemble it.
+	Payload []byte `json:"payload"`
 }
 
 // NewTransport returns a new Transport ready to be populated via DecodeFromBytes or
@@ -49,8 +54,9 @@ func (trans *Transport) DecodeFromBytes(data []byte) ([]byte, error) {
 	trans.First = (data[0] & 0b01000000) != 0
 	trans.Sequence = (data[0] & 0b00111111)
 	trans.Checksums = crcs
+	trans.Payload = clean[1:]
 
-	return clean[1:], nil
+	return trans.Payload, nil
 }
 
 func (trans *Transport) ToByte() (byte, error) {
@@ -77,6 +83,7 @@ func (trans *Transport) String() string {
 	return fmt.Sprintf(`Transport:
 	FIN: %t
 	FIR: %t
-	SEQ: %d`,
-		trans.Final, trans.First, trans.Sequence)
+	SEQ: %d
+	SEG: %d bytes`,
+		trans.Final, trans.First, trans.Sequence, len(trans.Payload))
 }

@@ -120,7 +120,7 @@ linters:
       # Never
       - linters:
           - forbidigo
-        path: dnp3/dnp3_test.go
+        path: dnp3/.*_test\.go
       - linters:
           - godox
         text: "Line contains TODO/BUG/FIXME"

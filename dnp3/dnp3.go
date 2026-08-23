@@ -187,6 +187,10 @@ func (dnp *Frame) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error
 	// leak into LayerContents.
 	dnp.contents = append([]byte(nil), data[:total]...)
 
+	// Frames are reused by DecodingLayerParser; drop any application layer
+	// left over from a previous decode.
+	dnp.Application = nil
+
 	err = dnp.DataLink.DecodeFromBytes(data[:10])
 	if err != nil {
 		return fmt.Errorf("error in DNP3 DataLink layer: %w", err)
@@ -207,29 +211,12 @@ func (dnp *Frame) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error
 // ignored. opts.FixLengths is honored implicitly since the length is always
 // recomputed from the current payload.
 func (dnp *Frame) SerializeTo(buf gopacket.SerializeBuffer, _ gopacket.SerializeOptions) error {
-	var transportApplication []byte
-
-	if dnp.DataLink.Control.carriesUserData() {
-		// get these first, for LEN in DL
-		transportByte, err := dnp.Transport.ToByte()
-		if err != nil {
-			return fmt.Errorf("error encoding transport header: %w", err)
-		}
-
-		transportApplication = append(transportApplication, transportByte)
-
-		// Application isn't always set
-		if dnp.Application != nil {
-			applicationBytes, err := dnp.Application.SerializeTo()
-			if err != nil {
-				return fmt.Errorf("error encoding application data: %w", err)
-			}
-
-			transportApplication = append(transportApplication, applicationBytes...)
-		}
+	transportApplication, err := dnp.encodeTransportApplication()
+	if err != nil {
+		return err
 	}
-	// len is 5 more bytes in DL, excludes CRCs
 
+	// len is 5 more bytes in DL, excludes CRCs
 	payloadLength := len(transportApplication)
 	totalLength := payloadLength + 5
 
@@ -320,6 +307,13 @@ func (dnp *Frame) decodeTransportAndApplication(data []byte) error {
 		return nil
 	}
 
+	// Only a frame carrying an entire application fragment (FIR and FIN) can
+	// be decoded on its own; segments of a multi-frame fragment are left to
+	// an Assembler.
+	if !dnp.Transport.First || !dnp.Transport.Final {
+		return nil
+	}
+
 	if dnp.DataLink.Control.Direction {
 		dnp.Application = &ApplicationRequest{}
 	} else {
@@ -332,4 +326,33 @@ func (dnp *Frame) decodeTransportAndApplication(data []byte) error {
 	}
 
 	return nil
+}
+
+// encodeTransportApplication returns the transport header byte followed by the
+// application bytes, before CRCs are inserted. Frames carrying no user data
+// encode to nothing.
+func (dnp *Frame) encodeTransportApplication() ([]byte, error) {
+	if !dnp.DataLink.Control.carriesUserData() {
+		return nil, nil
+	}
+
+	transportByte, err := dnp.Transport.ToByte()
+	if err != nil {
+		return nil, fmt.Errorf("error encoding transport header: %w", err)
+	}
+
+	out := []byte{transportByte}
+
+	// Application isn't always set: fragment segments and manually built
+	// frames carry raw transport payload bytes instead.
+	if dnp.Application == nil {
+		return append(out, dnp.Transport.Payload...), nil
+	}
+
+	applicationBytes, err := dnp.Application.SerializeTo()
+	if err != nil {
+		return nil, fmt.Errorf("error encoding application data: %w", err)
+	}
+
+	return append(out, applicationBytes...), nil
 }
