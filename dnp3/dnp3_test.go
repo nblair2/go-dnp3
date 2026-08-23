@@ -8,8 +8,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/google/gopacket"
-	"github.com/nblair2/go-dnp3/v2/dnp3"
+	"github.com/gopacket/gopacket"
+	"github.com/nblair2/go-dnp3/v3/dnp3"
 )
 
 var (

@@ -3,7 +3,7 @@ package dnp3_test
 import (
 	"fmt"
 
-	"github.com/nblair2/go-dnp3/v2/dnp3"
+	"github.com/nblair2/go-dnp3/v3/dnp3"
 )
 
 // ExampleAssembler reassembles an application fragment split across two link
