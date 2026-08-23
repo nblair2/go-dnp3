@@ -13,15 +13,21 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Run release-please
         id: release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: go
       - name: Show release info
+        env:
+          RELEASE_CREATED: ${{ steps.release.outputs.release_created }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          RELEASE_BODY: ${{ steps.release.outputs.body }}
         run: |
-          echo "Release created?  ${{ steps.release.outputs.release_created }}"
-          echo "Tag name:  ${{ steps.release.outputs.tag_name }}"
-          echo "Release notes body:  ${{ steps.release.outputs.body}}"
+          echo "Release created?  $RELEASE_CREATED"
+          echo "Tag name:  $TAG_NAME"
+          echo "Release notes body:  $RELEASE_BODY"

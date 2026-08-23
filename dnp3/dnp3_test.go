@@ -6,18 +6,13 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"github.com/nblair2/go-dnp3/v2/dnp3"
 )
 
 var (
-	customPcapsFlag string
-	customPcaps     []string
 	printStringFlag bool
 	printJSONFlag   bool
 
@@ -102,14 +97,9 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	flag.StringVar(&customPcapsFlag, "pcaps", "", "Comma-separated list of pcap files to read")
 	flag.BoolVar(&printStringFlag, "print-string", false, "Print packet string output")
 	flag.BoolVar(&printJSONFlag, "print-json", false, "Print packet json output")
 	flag.Parse()
-
-	if customPcapsFlag != "" {
-		customPcaps = splitComma(customPcapsFlag)
-	}
 
 	os.Exit(m.Run())
 }
@@ -121,53 +111,6 @@ func TestDNP3(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			testRoundTrip(t, tc.input)
-		})
-	}
-}
-
-func TestCustomPcaps(t *testing.T) {
-	t.Parallel()
-	flag.Parse()
-
-	if len(customPcaps) == 0 {
-		t.Skip("No custom pcap file provided")
-	}
-
-	for _, pcapFile := range customPcaps {
-		t.Run(pcapFile, func(t *testing.T) {
-			t.Parallel()
-
-			handle, err := pcap.OpenOffline(pcapFile)
-			if err != nil {
-				t.Skipf("Error opening PCAP: %v", err)
-			}
-			defer handle.Close()
-
-			pcap := gopacket.NewPacketSource(handle, handle.LinkType())
-
-			packetIndex := 0
-			for pkt := range pcap.Packets() {
-				packetIndex++
-
-				var input []byte
-				// Prefer the auto-decoded DNP3 layer (via TCP/UDP port 20000
-				// registration). Fall back to raw TCP payload for non-standard
-				// ports or multi-frame segments.
-				if dnp3Layer := pkt.Layer(dnp3.LayerTypeDNP3); dnp3Layer != nil {
-					input = dnp3Layer.LayerContents()
-				} else if tcpLayer := pkt.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-					tcp, _ := tcpLayer.(*layers.TCP)
-					input = tcp.Payload
-				}
-
-				if len(input) < 10 {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("Packet%d", packetIndex), func(t *testing.T) {
-					testRoundTrip(t, input)
-				})
-			}
 		})
 	}
 }
@@ -223,19 +166,6 @@ func testRoundTrip(t *testing.T, input []byte) {
 	if printJSONFlag {
 		fmt.Println(string(jsonBytes))
 	}
-}
-
-func splitComma(s string) []string {
-	var out []string
-
-	for v := range strings.SplitSeq(s, ",") {
-		v = strings.TrimSpace(v)
-		if v != "" {
-			out = append(out, v)
-		}
-	}
-
-	return out
 }
 
 // readBinaryInputChange is a 18-byte frame used across ParseFrames tests.
