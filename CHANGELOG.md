@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/nblair2/go-dnp3/compare/v2.1.0...v3.0.0) (2026-08-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* migrate to gopacket/gopacket fork ([#57](https://github.com/nblair2/go-dnp3/issues/57))
+
+### Miscellaneous Chores
+
+* migrate to gopacket/gopacket fork ([#57](https://github.com/nblair2/go-dnp3/issues/57)) ([c622ffe](https://github.com/nblair2/go-dnp3/commit/c622ffe6b3341fe0ba3d2b93e87b60a29c3931ab)), closes [#52](https://github.com/nblair2/go-dnp3/issues/52)
+
 ## [2.1.0](https://github.com/nblair2/go-dnp3/compare/v2.0.2...v2.1.0) (2026-08-23)
 
 
