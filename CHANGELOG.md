@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.2](https://github.com/nblair2/go-dnp3/compare/v2.0.1...v2.0.2) (2026-08-23)
+
+
+### Bug Fixes
+
+* guard decoders against short input ([3b91880](https://github.com/nblair2/go-dnp3/commit/3b918800ea0767e0454973a98523e7fa86e1e202))
+* objectType data race and sequence off-by-one ([2ca6942](https://github.com/nblair2/go-dnp3/commit/2ca694240012f58f23858f979b46d30a5fb1543c))
+* wire-format decode and round-trip bugs ([fc3fc87](https://github.com/nblair2/go-dnp3/commit/fc3fc873dc39f4533280a445ab4e078390ce9563))
+
 ## [2.0.1](https://github.com/nblair2/go-dnp3/compare/v2.0.0...v2.0.1) (2026-05-15)
 
 
