@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/nblair2/go-dnp3/compare/v2.0.2...v2.1.0) (2026-08-23)
+
+
+### Features
+
+* transport-layer reassembly / session API ([#58](https://github.com/nblair2/go-dnp3/issues/58)) ([7f19d0a](https://github.com/nblair2/go-dnp3/commit/7f19d0a79b067f82e3f22cc16afca58030b0dcad)), closes [#50](https://github.com/nblair2/go-dnp3/issues/50)
+
 ## [2.0.2](https://github.com/nblair2/go-dnp3/compare/v2.0.1...v2.0.2) (2026-08-23)
 
 
