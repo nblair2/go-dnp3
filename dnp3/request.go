@@ -32,6 +32,10 @@ func NewApplicationRequestFromBytes(data []byte) (*ApplicationRequest, error) {
 }
 
 func (appreq *ApplicationRequest) DecodeFromBytes(data []byte) error {
+	if len(data) < 2 {
+		return fmt.Errorf("application request requires at least 2 bytes, got %d", len(data))
+	}
+
 	appreq.Control.FromByte(data[0])
 
 	appreq.FunctionCode = RequestFunctionCode(data[1])
