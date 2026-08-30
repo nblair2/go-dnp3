@@ -239,7 +239,8 @@ func packerPointsBit(points []Point) ([]byte, error) {
 }
 
 func newPointsBitFlags(data []byte, num, prefSize int, _ PointPrefixCode) ([]Point, int, error) {
-	if num > len(data) {
+	size := num * (prefSize + 1)
+	if size > len(data) {
 		return nil, 0, fmt.Errorf("not enough bytes for %d 1-bit points with flags", num)
 	}
 
@@ -248,14 +249,18 @@ func newPointsBitFlags(data []byte, num, prefSize int, _ PointPrefixCode) ([]Poi
 	for pointIndex := range num {
 		point := &PointBit{hasFlags: true}
 
-		err := point.DecodeFromBytes([]byte{data[pointIndex]}, prefSize)
+		pointDataStart := pointIndex * (prefSize + 1)
+		pointDataEnd := (pointIndex + 1) * (prefSize + 1)
+		pointData := data[pointDataStart:pointDataEnd]
+
+		err := point.DecodeFromBytes(pointData, prefSize)
 		if err != nil {
-			return pointsOut, num, fmt.Errorf("could not decode point: 0x % X, err: %w",
-				data[pointIndex], err)
+			return pointsOut, size, fmt.Errorf("could not decode point: 0x % X, err: %w",
+				pointData, err)
 		}
 
 		pointsOut = append(pointsOut, point)
 	}
 
-	return pointsOut, num, nil
+	return pointsOut, size, nil
 }
