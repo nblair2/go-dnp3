@@ -263,8 +263,8 @@ func (do *DataObject) Indexes() []int {
 func (do *DataObject) updateIndexes() error {
 	switch rangeField := do.Header.RangeField.(type) {
 	case *StartStopRangeField:
-		for i := rangeField.Start; i <= rangeField.Stop; i++ {
-			do.indexes = append(do.indexes, int(i))
+		for i := range rangeField.NumObjects() {
+			do.indexes = append(do.indexes, int(rangeField.Start)+i)
 		}
 
 		return nil
