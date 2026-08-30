@@ -81,7 +81,8 @@ func (ad *ApplicationData) String() string {
 
 		var stringBuilder strings.Builder
 		for _, obj := range ad.Objects {
-			stringBuilder.WriteString("\n" + indent("- "+obj.String(), "\t"))
+			stringBuilder.WriteString("\n")
+			stringBuilder.WriteString(indent("- "+obj.String(), "\t"))
 		}
 
 		output += stringBuilder.String()
@@ -241,7 +242,8 @@ func (do *DataObject) String() string {
 				lines[i] = "  " + lines[i]
 			}
 
-			stringBuilder.WriteString("\n" + indent(strings.Join(lines, "\n"), "\t"))
+			stringBuilder.WriteString("\n")
+			stringBuilder.WriteString(indent(strings.Join(lines, "\n"), "\t"))
 		}
 	}
 
