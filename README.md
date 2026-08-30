@@ -27,11 +27,11 @@
 | `make setup` | Install development tools: `prek`, `stringer`, `libpcap-dev` |
 | `make generate` | Generate code using go generate |
 | `make lint` | Run all prek hooks (lint, spellcheck, format) on all files |
-| `make corpus` | Fetch the pcap test corpus (see test/testdata/corpus.txt) |
+| `make corpus` | Fetch the pcap test corpus (see test/corpus.txt) |
 | `make test` | Run tests with generated code |
 | `make clean` | Remove generated files and canary |
 
->  pcap corpus (pinned + checksummed in [`test/testdata/corpus.txt`](test/testdata/corpus.txt),
+>  pcap corpus (pinned + checksummed in [`test/corpus.txt`](test/corpus.txt),
 > sourced from the CC-BY-4.0 [ITI/ICS-Security-Tools](https://github.com/ITI/ICS-Security-Tools) captures
 
 #### PCAP Testing
