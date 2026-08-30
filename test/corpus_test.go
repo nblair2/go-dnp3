@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	corpusDir      = "testdata/corpus"
-	scoreboardPath = "testdata/corpus_scoreboard.md"
+	corpusDir      = "corpus"
+	scoreboardPath = "README.md"
 )
 
 var (
@@ -50,6 +50,21 @@ type corpusStats struct {
 func (stats corpusStats) String() string {
 	return fmt.Sprintf("payloads=%d frames=%d fragments=%d dropped=%d undecoded=%d",
 		stats.Payloads, stats.Frames, stats.Fragments, stats.Dropped, stats.Undecoded)
+}
+
+// Failed reports whether the parser dropped transport segments or left
+// payloads undecoded.
+func (stats corpusStats) Failed() bool {
+	return stats.Dropped > 0 || stats.Undecoded > 0
+}
+
+// icon is the scoreboard status glyph for stats.
+func (stats corpusStats) icon() string {
+	if stats.Failed() {
+		return "❌"
+	}
+
+	return "✅"
 }
 
 // TestCorpus round-trips every DNP3 frame in the pcaps fetched by
@@ -202,30 +217,56 @@ func serializeFrame(t *testing.T, frame *dnp3.Frame) []byte {
 func writeScoreboard(t *testing.T, results map[string]corpusStats) {
 	t.Helper()
 
-	nameWidth := len("pcap")
+	nameWidth := len("**Total**")
 	for name := range results {
 		nameWidth = max(nameWidth, len(name))
 	}
+
+	var (
+		total   corpusStats
+		passing int
+	)
+
+	for _, stats := range results {
+		total.Payloads += stats.Payloads
+		total.Frames += stats.Frames
+		total.Fragments += stats.Fragments
+		total.Dropped += stats.Dropped
+		total.Undecoded += stats.Undecoded
+
+		if !stats.Failed() {
+			passing++
+		}
+	}
+
+	totalStatus := fmt.Sprintf("%d/%d (%d%%)", passing, len(results), passing*100/len(results))
+	statusWidth := max(len("status"), len(totalStatus))
 
 	var builder strings.Builder
 
 	builder.WriteString("# DNP3 corpus scoreboard\n\n")
 	builder.WriteString(
-		"Regenerate with `go test ./test -run TestCorpus -args -update-scoreboard`.\n\n")
+		"Per-pcap round-trip results from `TestCorpus`. Regenerate with " +
+			"`go test ./test -run TestCorpus -args -update-scoreboard`.\n\n")
 	builder.WriteString(
 		"`fragments` are application fragments reassembled by `dnp3.Assembler`;\n" +
-			"`dropped` are transport segments it could not use.\n\n")
-	fmt.Fprintf(&builder, "| %-*s | payloads | frames | fragments | dropped | undecoded |\n",
-		nameWidth, "pcap")
-	fmt.Fprintf(&builder, "| %s | -------: | -----: | --------: | ------: | --------: |\n",
-		strings.Repeat("-", nameWidth))
+			"`dropped` are transport segments it could not use. `status` is ❌ when\n" +
+			"either is nonzero for that pcap.\n\n")
+	fmt.Fprintf(&builder, "| %-*s | payloads | frames | fragments | dropped | undecoded | %-*s |\n",
+		nameWidth, "pcap", statusWidth, "status")
+	fmt.Fprintf(&builder, "| %s | -------: | -----: | --------: | ------: | --------: | :%s: |\n",
+		strings.Repeat("-", nameWidth), strings.Repeat("-", statusWidth-2))
 
 	for _, name := range slices.Sorted(maps.Keys(results)) {
 		stats := results[name]
-		fmt.Fprintf(&builder, "| %-*s | %8d | %6d | %9d | %7d | %9d |\n",
+		fmt.Fprintf(&builder, "| %-*s | %8d | %6d | %9d | %7d | %9d | %-*s |\n",
 			nameWidth, name, stats.Payloads, stats.Frames,
-			stats.Fragments, stats.Dropped, stats.Undecoded)
+			stats.Fragments, stats.Dropped, stats.Undecoded, statusWidth, stats.icon())
 	}
+
+	fmt.Fprintf(&builder, "| %-*s | %8d | %6d | %9d | %7d | %9d | %-*s |\n",
+		nameWidth, "**Total**", total.Payloads, total.Frames,
+		total.Fragments, total.Dropped, total.Undecoded, statusWidth, totalStatus)
 
 	err := os.WriteFile(scoreboardPath, []byte(builder.String()), 0o600)
 	if err != nil {
@@ -245,15 +286,17 @@ func compareScoreboard(t *testing.T, results map[string]corpusStats) {
 
 	for line := range strings.SplitSeq(string(content), "\n") {
 		var (
-			name  string
-			stats corpusStats
+			name   string
+			stats  corpusStats
+			status string
 		)
 
-		// Only table rows with numeric cells match; the header, separator,
-		// and prose lines do not.
-		_, scanErr := fmt.Sscanf(line, "| %s | %d | %d | %d | %d | %d |",
+		// Only per-pcap rows match: five numeric cells followed by a
+		// space-free status token. The header, separator, prose lines, and
+		// the Total row (whose status cell contains a space) do not.
+		_, scanErr := fmt.Sscanf(line, "| %s | %d | %d | %d | %d | %d | %s |",
 			&name, &stats.Payloads, &stats.Frames,
-			&stats.Fragments, &stats.Dropped, &stats.Undecoded)
+			&stats.Fragments, &stats.Dropped, &stats.Undecoded, &status)
 		if scanErr != nil {
 			continue
 		}

@@ -11,7 +11,7 @@ help:
 	@echo "  generate     - Generate code using go generate"
 	@echo "  lint         - Run all prek hooks (lint, spellcheck, format) on all files"
 	@echo "  spell        - Check for spelling errors in the codebase"
-	@echo "  corpus       - Fetch the pcap test corpus (see test/testdata/corpus.txt)"
+	@echo "  corpus       - Fetch the pcap test corpus (see test/corpus.txt)"
 	@echo "  test         - Run tests with generated code"
 	@echo "  example      - Run the example program (example.go)"
 	@echo "  clean        - Remove generated files and canary"
@@ -37,15 +37,15 @@ spell:
 	prek run codespell --all-files
 
 corpus:
-	@mkdir -p test/testdata/corpus
+	@mkdir -p test/corpus
 	@while read -r name sha url; do \
 		case "$$name" in ''|\#*) continue;; esac; \
-		f="test/testdata/corpus/$$name"; \
+		f="test/corpus/$$name"; \
 		echo "$$sha  $$f" | sha256sum --check --quiet --status - 2>/dev/null && continue; \
 		echo "fetching $$name"; \
 		curl -sSfL "$$url" -o "$$f" || exit 1; \
 		echo "$$sha  $$f" | sha256sum --check --quiet - || { rm -f "$$f"; exit 1; }; \
-	done < test/testdata/corpus.txt
+	done < test/corpus.txt
 
 test: generate
 	go test -v ./...
