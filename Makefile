@@ -1,8 +1,16 @@
-.PHONY: help setup install-deps generate lint spell corpus test example clean
+.PHONY: help setup install-deps generate lint spell corpus test example bump-major check-major clean
 
 include .github/versions.env
 
 export PATH := $(HOME)/.local/bin:$(HOME)/go/bin:$(PATH)
+
+# The module major version is repeated in go.mod, every import path, and the
+# README doc link, so bump and check them as a set.
+MODULE      = $(shell sed -n 's/^module //p' go.mod)
+MAJOR       = $(patsubst v%,%,$(notdir $(MODULE)))
+UNVERSIONED = $(patsubst %/,%,$(dir $(MODULE)))
+VERSIONED   = go.mod README.md $(shell git ls-files '*.go')
+NEW_MAJOR  ?= $(shell expr $(MAJOR) + 1)
 
 help:
 	@echo "Available targets:"
@@ -14,6 +22,8 @@ help:
 	@echo "  corpus       - Fetch the pcap test corpus (see test/corpus.txt)"
 	@echo "  test         - Run tests with generated code"
 	@echo "  example      - Run the example program (example.go)"
+	@echo "  bump-major   - Bump the module major version (go.mod, imports, README)"
+	@echo "  check-major  - Verify go.mod, imports, and README agree on the major"
 	@echo "  clean        - Remove generated files and canary"
 
 install-deps:
@@ -52,6 +62,19 @@ test: generate
 
 example: generate
 	go run .
+
+bump-major:
+	sed -i 's|$(UNVERSIONED)/v$(MAJOR)|$(UNVERSIONED)/v$(NEW_MAJOR)|g' $(VERSIONED)
+	@echo "bumped module major: v$(MAJOR) -> v$(NEW_MAJOR)"
+
+check-major:
+	@stale=$$(grep -n '$(UNVERSIONED)/v[0-9][0-9]*' $(VERSIONED) \
+		| grep -v '$(UNVERSIONED)/v$(MAJOR)\b') || true; \
+	if [ -n "$$stale" ]; then \
+		echo "module major is v$(MAJOR), but these disagree:"; \
+		echo "$$stale"; \
+		exit 1; \
+	fi
 
 clean:
 	rm -f **/*_string.go .generated-canary
