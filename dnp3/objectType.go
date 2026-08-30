@@ -553,7 +553,7 @@ var objectTypes = map[groupVariation]*objectType{
 	},
 	{50, 2}: {
 		Description: "(Info) Time and Date - Absolute Time and Interval",
-		Constructor: makeBytesConstructor(layoutValueAbsTime, 10),
+		Constructor: makeBytesConstructor(layoutAbsTimeValue, 10),
 		Packer:      packPointsBytes,
 	},
 	{50, 3}: {
