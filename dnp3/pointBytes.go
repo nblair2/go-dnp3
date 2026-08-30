@@ -14,6 +14,7 @@ const (
 	pointFieldFlags   pointField = iota // 1 byte
 	pointFieldAbsTime                   // 6 bytes
 	pointFieldRelTime                   // 2 bytes
+	pointFieldStatus                    // 1 byte
 	pointFieldValue                     // variable width
 )
 
@@ -21,6 +22,7 @@ var pointFieldWidths = map[pointField]int{
 	pointFieldFlags:   1,
 	pointFieldAbsTime: 6,
 	pointFieldRelTime: 2,
+	pointFieldStatus:  1,
 }
 
 // pointBytesLayout describes the field order for a PointBytes instance.
@@ -64,6 +66,7 @@ type PointBytes struct {
 	RelativeTime      *RelativeTime `json:"relative_time,omitempty"`
 	layout            pointBytesLayout
 	expectedValueSize int
+	Status            *CommandStatus `json:"status,omitempty"`
 }
 
 func (p *PointBytes) DataType() PointDataType { return PointDataTypeBytes }
@@ -132,6 +135,10 @@ func (p *PointBytes) String() string {
 		parts = append(parts, p.Flags.String())
 	}
 
+	if p.Status != nil {
+		parts = append(parts, "Status: "+p.Status.String())
+	}
+
 	if len(p.Value) > 0 {
 		parts = append(parts, fmt.Sprintf("Value: 0x % X", p.Value))
 	}
@@ -175,6 +182,24 @@ func (p *PointBytes) SetFlags(flags PointFlags) error {
 	}
 
 	p.Flags = &flags
+
+	return nil
+}
+
+func (p *PointBytes) GetStatus() (CommandStatus, error) {
+	if p.Status == nil {
+		return 0, ErrNoStatus
+	}
+
+	return *p.Status, nil
+}
+
+func (p *PointBytes) SetStatus(status CommandStatus) error {
+	if !p.layout.hasField(pointFieldStatus) {
+		return ErrNoStatus
+	}
+
+	p.Status = &status
 
 	return nil
 }
@@ -263,6 +288,7 @@ func (p *PointBytes) Fields() PointFields {
 		Value:        p.layout.hasField(pointFieldValue),
 		AbsoluteTime: p.layout.hasField(pointFieldAbsTime),
 		RelativeTime: p.layout.hasField(pointFieldRelTime),
+		Status:       p.layout.hasField(pointFieldStatus),
 	}
 }
 
@@ -369,6 +395,16 @@ func (p *PointBytes) parseField(
 
 		return remaining[2:], nil
 
+	case pointFieldStatus:
+		if len(remaining) < 1 {
+			return nil, fmt.Errorf("not enough data for status: need 1, have %d", len(remaining))
+		}
+
+		status := CommandStatus(remaining[0])
+		p.Status = &status
+
+		return remaining[1:], nil
+
 	case pointFieldValue:
 		suffixWidth := p.layout.suffixWidthAfter(fieldIdx)
 		valueWidth := len(remaining) - suffixWidth
@@ -390,6 +426,8 @@ func (p *PointBytes) parseField(
 }
 
 // encodeField encodes a single field into bytes.
+//
+//nolint:cyclop // straightforward switch
 func (p *PointBytes) encodeField(field pointField) ([]byte, error) {
 	switch field {
 	case pointFieldFlags:
@@ -412,6 +450,13 @@ func (p *PointBytes) encodeField(field pointField) ([]byte, error) {
 		}
 
 		return TimeRelativeToBytes(*p.RelativeTime)
+
+	case pointFieldStatus:
+		if p.Status == nil {
+			return nil, errors.New("status field is required by layout but is nil")
+		}
+
+		return []byte{byte(*p.Status)}, nil
 
 	case pointFieldValue:
 		return p.encodeFieldValue(), nil
@@ -440,7 +485,7 @@ var (
 		fields: []pointField{pointFieldFlags, pointFieldValue},
 	}
 	layoutFlagsAbsTime = pointBytesLayout{
-		fields: []pointField{pointFieldFlags, pointFieldAbsTime, pointFieldValue},
+		fields: []pointField{pointFieldFlags, pointFieldValue, pointFieldAbsTime},
 	}
 	layoutValueAbsTime = pointBytesLayout{
 		fields: []pointField{pointFieldValue, pointFieldAbsTime},
@@ -453,6 +498,15 @@ var (
 	}
 	layoutRelTime = pointBytesLayout{
 		fields: []pointField{pointFieldRelTime},
+	}
+	layoutValueStatus = pointBytesLayout{
+		fields: []pointField{pointFieldValue, pointFieldStatus},
+	}
+	layoutStatusValue = pointBytesLayout{
+		fields: []pointField{pointFieldStatus, pointFieldValue},
+	}
+	layoutStatusValueAbsTime = pointBytesLayout{
+		fields: []pointField{pointFieldStatus, pointFieldValue, pointFieldAbsTime},
 	}
 )
 
@@ -470,6 +524,10 @@ func newPointBytesWithLayout(layout pointBytesLayout, width int) func() *PointBy
 
 	if layout.hasField(pointFieldRelTime) {
 		fixedFieldsWidth += pointFieldWidths[pointFieldRelTime]
+	}
+
+	if layout.hasField(pointFieldStatus) {
+		fixedFieldsWidth += pointFieldWidths[pointFieldStatus]
 	}
 
 	calculatedExpectedValueSize := 0
