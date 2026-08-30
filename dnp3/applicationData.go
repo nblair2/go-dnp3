@@ -145,17 +145,20 @@ func (do *DataObject) DecodeFromBytes(data []byte) error {
 	headSize := do.Header.SizeOf()
 	do.totalSize = headSize
 
-	if do.Header.objectType == nil || do.Header.objectType.Constructor == nil {
-		do.Extra = data[headSize:]
-		do.totalSize += len(do.Extra)
-
-		return fmt.Errorf("unsupported group/variation: %d/%d",
-			do.Header.Group, do.Header.Variation)
+	// An unknown group/variation can't even be described; reject it outright.
+	if do.Header.objectType == nil {
+		return do.markUnsupported(data, headSize)
 	}
 
+	// A known group/variation with no Constructor (e.g. a var-0 "Any
+	// Variations" entry) is only valid on the wire as a zero-point read-all.
 	numPoints := do.Header.RangeField.NumObjects()
 	if numPoints == 0 {
 		return nil
+	}
+
+	if do.Header.objectType.Constructor == nil {
+		return do.markUnsupported(data, headSize)
 	}
 
 	var size int
@@ -256,6 +259,16 @@ func (do *DataObject) SizeOf() int {
 
 func (do *DataObject) Indexes() []int {
 	return do.indexes
+}
+
+// markUnsupported stashes the undecoded remainder in Extra and reports the
+// group/variation as unsupported.
+func (do *DataObject) markUnsupported(data []byte, headSize int) error {
+	do.Extra = data[headSize:]
+	do.totalSize += len(do.Extra)
+
+	return fmt.Errorf("unsupported group/variation: %d/%d",
+		do.Header.Group, do.Header.Variation)
 }
 
 func (do *DataObject) updateIndexes() error {
