@@ -15,11 +15,13 @@ type Point interface {
 	DataType() PointDataType
 	GetIndex() (int, error)
 	GetFlags() (PointFlags, error)
+	GetStatus() (CommandStatus, error)
 	GetAbsTime() (AbsoluteTime, error)
 	GetRelTime() (RelativeTime, error)
 	GetValue() any
 	SetIndex(index int) error
 	SetFlags(flags PointFlags) error
+	SetStatus(status CommandStatus) error
 	SetAbsTime(absTime AbsoluteTime) error
 	SetRelTime(relTime RelativeTime) error
 	SetValue(value any) error
@@ -33,6 +35,7 @@ type PointFields struct {
 	Value        bool `json:"value"`
 	AbsoluteTime bool `json:"absolute_time"`
 	RelativeTime bool `json:"relative_time"`
+	Status       bool `json:"status"`
 }
 
 // PointDataType identifies the kind of data a Point holds.
@@ -52,9 +55,43 @@ type PointsPacker func([]Point) ([]byte, error)
 var (
 	ErrNoIndex   = errors.New("point does not have an index")
 	ErrNoFlags   = errors.New("point type does not have flags")
+	ErrNoStatus  = errors.New("point type does not have a command status")
 	ErrNoAbsTime = errors.New("point type does not have an absolute time")
 	ErrNoRelTime = errors.New("point type does not have a relative time")
 )
+
+// CommandStatus is the result code returned in command-echo and analog/
+// counter command-event points. Unlike PointFlags, decoding is a plain
+// cast: any byte value is a valid (if reserved) status code.
+//
+//go:generate stringer -type=CommandStatus
+type CommandStatus uint8
+
+const (
+	Success CommandStatus = iota // 0x00
+	Timeout
+	NoSelect
+	FormatError
+	CommandNotSupported // DataLinkSecondaryFunctionCode already claims NotSupported.
+	AlreadyActive
+	HardwareError
+	Local
+	TooManyOps
+	NotAuthorized
+	AutomationInhibit
+	ProcessingLimited
+	OutOfRange
+	DownstreamLocal
+	AlreadyComplete
+	Blocked
+	Canceled
+	BlockedOtherMaster
+	DownstreamFail // 0x12
+)
+
+// NonParticipating indicates the outstation did not participate in the
+// operation (e.g. control-execute functionality is disabled for the point).
+const NonParticipating CommandStatus = 126 // 0x7E
 
 // PointFlags describes the quality flags common to most DNP3 point types.
 type PointFlags struct {

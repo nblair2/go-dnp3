@@ -55,11 +55,13 @@ func (p *Point2Bits) Fields() PointFields {
 
 func (p *Point2Bits) GetIndex() (int, error)            { return 0, ErrNoIndex }
 func (p *Point2Bits) GetFlags() (PointFlags, error)     { return PointFlags{}, ErrNoFlags }
+func (p *Point2Bits) GetStatus() (CommandStatus, error) { return 0, ErrNoStatus }
 func (p *Point2Bits) GetAbsTime() (AbsoluteTime, error) { return AbsoluteTime{}, ErrNoAbsTime }
 func (p *Point2Bits) GetRelTime() (RelativeTime, error) { return 0, ErrNoRelTime }
 func (p *Point2Bits) GetValue() any                     { return p.Value }
 func (p *Point2Bits) SetIndex(int) error                { return ErrNoIndex }
 func (p *Point2Bits) SetFlags(PointFlags) error         { return ErrNoFlags }
+func (p *Point2Bits) SetStatus(CommandStatus) error     { return ErrNoStatus }
 func (p *Point2Bits) SetAbsTime(AbsoluteTime) error     { return ErrNoAbsTime }
 func (p *Point2Bits) SetRelTime(RelativeTime) error     { return ErrNoRelTime }
 

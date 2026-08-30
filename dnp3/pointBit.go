@@ -113,6 +113,8 @@ func (p *PointBit) SetFlags(f PointFlags) error {
 	return nil
 }
 
+func (p *PointBit) GetStatus() (CommandStatus, error) { return 0, ErrNoStatus }
+func (p *PointBit) SetStatus(CommandStatus) error     { return ErrNoStatus }
 func (p *PointBit) GetAbsTime() (AbsoluteTime, error) { return AbsoluteTime{}, ErrNoAbsTime }
 func (p *PointBit) SetAbsTime(AbsoluteTime) error     { return ErrNoAbsTime }
 func (p *PointBit) GetRelTime() (RelativeTime, error) { return 0, ErrNoRelTime }

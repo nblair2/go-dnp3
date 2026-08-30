@@ -313,42 +313,42 @@ var objectTypes = map[groupVariation]*objectType{
 	{32, 0}: {Description: "(Event) Analog Input Event - Any Variations"},
 	{32, 1}: {
 		Description: "(Event) Analog Input Event - 32-bit",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutFlags, 5),
 		Packer:      packPointsBytes,
 	},
 	{32, 2}: {
 		Description: "(Event) Analog Input Event - 16-bit",
-		Constructor: makeBytesConstructor(layoutValue, 3),
+		Constructor: makeBytesConstructor(layoutFlags, 3),
 		Packer:      packPointsBytes,
 	},
 	{32, 3}: {
 		Description: "(Event) Analog Input Event - 32-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{32, 4}: {
 		Description: "(Event) Analog Input Event - 16-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 9),
 		Packer:      packPointsBytes,
 	},
 	{32, 5}: {
 		Description: "(Event) Analog Input Event - Single-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutFlags, 5),
 		Packer:      packPointsBytes,
 	},
 	{32, 6}: {
 		Description: "(Event) Analog Input Event - Double-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutFlags, 9),
 		Packer:      packPointsBytes,
 	},
 	{32, 7}: {
 		Description: "(Event) Analog Input Event - Single-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{32, 8}: {
 		Description: "(Event) Analog Input Event - Double-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 15),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 15),
 		Packer:      packPointsBytes,
 	},
 
@@ -356,42 +356,42 @@ var objectTypes = map[groupVariation]*objectType{
 	{33, 0}: {Description: "(Event) Frozen Analog Input Event - Any Variations"},
 	{33, 1}: {
 		Description: "(Event) Frozen Analog Input Event - 32-bit",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutFlags, 5),
 		Packer:      packPointsBytes,
 	},
 	{33, 2}: {
 		Description: "(Event) Frozen Analog Input Event - 16-bit",
-		Constructor: makeBytesConstructor(layoutValue, 3),
+		Constructor: makeBytesConstructor(layoutFlags, 3),
 		Packer:      packPointsBytes,
 	},
 	{33, 3}: {
 		Description: "(Event) Frozen Analog Input Event - 32-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{33, 4}: {
 		Description: "(Event) Frozen Analog Input Event - 16-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 9),
 		Packer:      packPointsBytes,
 	},
 	{33, 5}: {
 		Description: "(Event) Frozen Analog Input Event - Single-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutFlags, 5),
 		Packer:      packPointsBytes,
 	},
 	{33, 6}: {
 		Description: "(Event) Frozen Analog Input Event - Double-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutFlags, 9),
 		Packer:      packPointsBytes,
 	},
 	{33, 7}: {
 		Description: "(Event) Frozen Analog Input Event - Single-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{33, 8}: {
 		Description: "(Event) Frozen Analog Input Event - Double-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 15),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 15),
 		Packer:      packPointsBytes,
 	},
 
@@ -440,22 +440,22 @@ var objectTypes = map[groupVariation]*objectType{
 	{41, 0}: {Description: "(Command) Analog Output Command - Any Variations"},
 	{41, 1}: {
 		Description: "(Command) Analog Output Command - 32-bit",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutValueStatus, 5),
 		Packer:      packPointsBytes,
 	},
 	{41, 2}: {
 		Description: "(Command) Analog Output Command - 16-bit",
-		Constructor: makeBytesConstructor(layoutValue, 3),
+		Constructor: makeBytesConstructor(layoutValueStatus, 3),
 		Packer:      packPointsBytes,
 	},
 	{41, 3}: {
 		Description: "(Command) Analog Output Command - Single-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutValueStatus, 5),
 		Packer:      packPointsBytes,
 	},
 	{41, 4}: {
 		Description: "(Command) Analog Output Command - Double-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutValueStatus, 9),
 		Packer:      packPointsBytes,
 	},
 
@@ -463,42 +463,42 @@ var objectTypes = map[groupVariation]*objectType{
 	{42, 0}: {Description: "(Event) Analog Output Event - Any Variations"},
 	{42, 1}: {
 		Description: "(Event) Analog Output Event - 32-bit",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutFlags, 5),
 		Packer:      packPointsBytes,
 	},
 	{42, 2}: {
 		Description: "(Event) Analog Output Event - 16-bit",
-		Constructor: makeBytesConstructor(layoutValue, 3),
+		Constructor: makeBytesConstructor(layoutFlags, 3),
 		Packer:      packPointsBytes,
 	},
 	{42, 3}: {
 		Description: "(Event) Analog Output Event - 32-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{42, 4}: {
 		Description: "(Event) Analog Output Event - 16-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 9),
 		Packer:      packPointsBytes,
 	},
 	{42, 5}: {
 		Description: "(Event) Analog Output Event - Single-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutFlags, 5),
 		Packer:      packPointsBytes,
 	},
 	{42, 6}: {
 		Description: "(Event) Analog Output Event - Double-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutFlags, 9),
 		Packer:      packPointsBytes,
 	},
 	{42, 7}: {
 		Description: "(Event) Analog Output Event - Single-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{42, 8}: {
 		Description: "(Event) Analog Output Event - Double-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 15),
+		Constructor: makeBytesConstructor(layoutFlagsAbsTime, 15),
 		Packer:      packPointsBytes,
 	},
 
@@ -506,42 +506,42 @@ var objectTypes = map[groupVariation]*objectType{
 	{43, 0}: {Description: "(Event) Analog Output Command Event - Any Variations"},
 	{43, 1}: {
 		Description: "(Event) Analog Output Command Event - 32-bit",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutStatusValue, 5),
 		Packer:      packPointsBytes,
 	},
 	{43, 2}: {
 		Description: "(Event) Analog Output Command Event - 16-bit",
-		Constructor: makeBytesConstructor(layoutValue, 3),
+		Constructor: makeBytesConstructor(layoutStatusValue, 3),
 		Packer:      packPointsBytes,
 	},
 	{43, 3}: {
 		Description: "(Event) Analog Output Command Event - 32-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutStatusValueAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{43, 4}: {
 		Description: "(Event) Analog Output Command Event - 16-bit with Time",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutStatusValueAbsTime, 9),
 		Packer:      packPointsBytes,
 	},
 	{43, 5}: {
 		Description: "(Event) Analog Output Command Event - Single-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 5),
+		Constructor: makeBytesConstructor(layoutStatusValue, 5),
 		Packer:      packPointsBytes,
 	},
 	{43, 6}: {
 		Description: "(Event) Analog Output Command Event - Double-prec. FP",
-		Constructor: makeBytesConstructor(layoutValue, 9),
+		Constructor: makeBytesConstructor(layoutStatusValue, 9),
 		Packer:      packPointsBytes,
 	},
 	{43, 7}: {
 		Description: "(Event) Analog Output Command Event - Single-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 11),
+		Constructor: makeBytesConstructor(layoutStatusValueAbsTime, 11),
 		Packer:      packPointsBytes,
 	},
 	{43, 8}: {
 		Description: "(Event) Analog Output Command Event - Double-prec. FP with Time",
-		Constructor: makeBytesConstructor(layoutValue, 15),
+		Constructor: makeBytesConstructor(layoutStatusValueAbsTime, 15),
 		Packer:      packPointsBytes,
 	},
 
