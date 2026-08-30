@@ -490,6 +490,9 @@ var (
 	layoutValueAbsTime = pointBytesLayout{
 		fields: []pointField{pointFieldValue, pointFieldAbsTime},
 	}
+	layoutAbsTimeValue = pointBytesLayout{
+		fields: []pointField{pointFieldAbsTime, pointFieldValue},
+	}
 	layoutValueRelTime = pointBytesLayout{
 		fields: []pointField{pointFieldValue, pointFieldRelTime},
 	}
