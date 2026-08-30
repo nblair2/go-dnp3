@@ -91,10 +91,10 @@ func newPoints2Bits(data []byte, num, prefSize int, _ PointPrefixCode) ([]Point,
 	pointsOut := make([]Point, 0, num)
 
 	for pointIndex := range num {
-		mask1 = 0b00000001 << (pointIndex % 8)
-		mask2 = 0b00000010 << (pointIndex % 8)
+		mask1 = 0b00000001 << ((pointIndex % 4) * 2)
+		mask2 = 0b00000010 << ((pointIndex % 4) * 2)
 
-		sourceByte := data[pointIndex%8]
+		sourceByte := data[pointIndex/4]
 		point := &Point2Bits{
 			Value: [2]bool{
 				(sourceByte & mask1) != 0,
