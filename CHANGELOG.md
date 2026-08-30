@@ -1,5 +1,27 @@
 # Changelog
 
+## [4.0.0](https://github.com/nblair2/go-dnp3/compare/v3.0.0...v4.0.0) (2026-08-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* decode event flags, status, and time as first-class fields ([#70](https://github.com/nblair2/go-dnp3/issues/70))
+
+### Features
+
+* **assemble:** add AssemblePayload for TCP payload ([#61](https://github.com/nblair2/go-dnp3/issues/61)) ([05dc362](https://github.com/nblair2/go-dnp3/commit/05dc362fd15c3d5e5fdf32a797d232e752ff7c1c))
+* decode event flags, status, and time as first-class fields ([#70](https://github.com/nblair2/go-dnp3/issues/70)) ([eb9d8cd](https://github.com/nblair2/go-dnp3/commit/eb9d8cd97978af9fa302544fd5a715d5ef34d648)), closes [#46](https://github.com/nblair2/go-dnp3/issues/46)
+
+
+### Bug Fixes
+
+* accept read-all variation-0 requests for all groups ([#68](https://github.com/nblair2/go-dnp3/issues/68)) ([f2c22f8](https://github.com/nblair2/go-dnp3/commit/f2c22f84dd6b7ff100bbf83f676f2190c9a2d02e)), closes [#45](https://github.com/nblair2/go-dnp3/issues/45)
+* bound updateIndexes iteration to prevent uint32 wrap ([#66](https://github.com/nblair2/go-dnp3/issues/66)) ([0fa43e1](https://github.com/nblair2/go-dnp3/commit/0fa43e1bca30680358012ed5f3b83e4834929c32)), closes [#30](https://github.com/nblair2/go-dnp3/issues/30)
+* correct byte index and masks in newPoints2Bits ([#67](https://github.com/nblair2/go-dnp3/issues/67)) ([19cfffc](https://github.com/nblair2/go-dnp3/commit/19cfffc94161941e66edb895749c1df6801bf2ec)), closes [#31](https://github.com/nblair2/go-dnp3/issues/31)
+* decode g50v2 absolute time before interval ([#72](https://github.com/nblair2/go-dnp3/issues/72)) ([785ffc5](https://github.com/nblair2/go-dnp3/commit/785ffc58d5c9e99ef80674b048e07ed2260bf9f0)), closes [#71](https://github.com/nblair2/go-dnp3/issues/71)
+* guard ApplicationRequest.DecodeFromBytes against short input ([#65](https://github.com/nblair2/go-dnp3/issues/65)) ([ce85a7a](https://github.com/nblair2/go-dnp3/commit/ce85a7acc0471a92f70c8b71a55915b780c493d0)), closes [#33](https://github.com/nblair2/go-dnp3/issues/33)
+* honor index prefix in newPointsBitFlags ([#73](https://github.com/nblair2/go-dnp3/issues/73)) ([27c400e](https://github.com/nblair2/go-dnp3/commit/27c400ef0500d2b5329f3528e221e4395722e6a1)), closes [#32](https://github.com/nblair2/go-dnp3/issues/32)
+
 ## [3.0.0](https://github.com/nblair2/go-dnp3/compare/v2.1.0...v3.0.0) (2026-08-23)
 
 
