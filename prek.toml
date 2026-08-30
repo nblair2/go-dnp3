@@ -92,6 +92,16 @@ files = '\.go$'
 pass_filenames = false
 priority = "fixers"
 
+# The module major version is duplicated across go.mod, imports, and the README
+[[repos.hooks]]
+id = "check-major"
+name = "check module major"
+language = "system"
+entry = "make check-major"
+files = '(\.go|go\.mod|README\.md)$'
+pass_filenames = false
+priority = "lint"
+
 [[repos]]
 repo = "https://github.com/codespell-project/codespell"
 rev = "v2.4.3"

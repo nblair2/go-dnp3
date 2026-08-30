@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nblair2/go-dnp3/v3/dnp3"
+	"github.com/nblair2/go-dnp3/v4/dnp3"
 )
 
 // TestG50V2AbsoluteTimeBeforeValue verifies that a Group 50 Variation 2
