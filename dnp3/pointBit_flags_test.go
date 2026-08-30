@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nblair2/go-dnp3/v3/dnp3"
+	"github.com/nblair2/go-dnp3/v4/dnp3"
 )
 
 // bitFlagsObject builds the bytes of a Group 1 Var 2 (binary input status

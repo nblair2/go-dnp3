@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/gopacket/gopacket"
-	"github.com/nblair2/go-dnp3/v3/dnp3"
+	"github.com/nblair2/go-dnp3/v4/dnp3"
 )
 
 var (

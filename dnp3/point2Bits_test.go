@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/nblair2/go-dnp3/v3/dnp3"
+	"github.com/nblair2/go-dnp3/v4/dnp3"
 )
 
 // point2BitsObject builds the bytes of a Group 3 Var 1 (packed double-bit

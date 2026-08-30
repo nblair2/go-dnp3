@@ -1,4 +1,4 @@
-module github.com/nblair2/go-dnp3/v3
+module github.com/nblair2/go-dnp3/v4
 
 go 1.27.0
 

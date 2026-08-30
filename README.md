@@ -1,7 +1,7 @@
 # go-dnp3
 
 [![Release](https://img.shields.io/github/v/release/nblair2/go-dnp3?style=flat-square)](https://github.com/nblair2/go-dnp3/releases/latest)
-[![GoDoc](https://godoc.org/github.com/nblair2/go-dnp3?status.svg)](https://godoc.org/github.com/nblair2/go-dnp3/v3/dnp3)
+[![GoDoc](https://godoc.org/github.com/nblair2/go-dnp3?status.svg)](https://godoc.org/github.com/nblair2/go-dnp3/v4/dnp3)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/nblair2/go-dnp3?filename=go.mod&style=flat-square)](go.mod)
 [![License](https://img.shields.io/github/license/nblair2/go-dnp3?style=flat-square)](LICENSE.txt)
 

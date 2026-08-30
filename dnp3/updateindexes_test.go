@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nblair2/go-dnp3/v3/dnp3"
+	"github.com/nblair2/go-dnp3/v4/dnp3"
 )
 
 // maxStartStopRequest is a Read request for group 1 var 1 (Binary Input,
