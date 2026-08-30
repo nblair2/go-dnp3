@@ -418,3 +418,153 @@ func TestAssembler_wireRoundTrip(t *testing.T) {
 
 	checkReadFragment(t, fragment, len(segments))
 }
+
+// wirePayload serializes segments and concatenates them into a single on-wire
+// payload, as a device would pack multiple link frames into one TCP read.
+func wirePayload(t *testing.T, segments ...*dnp3.Frame) []byte {
+	t.Helper()
+
+	// 292 bytes is the maximum on-wire size of a DNP3 link frame.
+	wire := make([]byte, 0, len(segments)*292)
+	for _, segment := range segments {
+		wire = append(wire, serializeFrame(t, segment)...)
+	}
+
+	return wire
+}
+
+// TestAssemblePayload_multiFrameSinglePayload is the regression for the pepper-puddle
+// stall: a whole fragment whose transport segments are concatenated into one
+// payload must reassemble in a single call, not stall after the first frame.
+func TestAssemblePayload_multiFrameSinglePayload(t *testing.T) {
+	t.Parallel()
+
+	payload := wirePayload(t,
+		masterSegment(true, false, 10, readClass1230Fragment[:4]),
+		masterSegment(false, false, 11, readClass1230Fragment[4:9]),
+		masterSegment(false, true, 12, readClass1230Fragment[9:]),
+	)
+
+	assembler := &dnp3.Assembler{}
+
+	frames, fragments, rest, err := assembler.AssemblePayload(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(frames) != 3 {
+		t.Fatalf("parsed %d frames, want 3", len(frames))
+	}
+
+	if len(rest) != 0 {
+		t.Fatalf("rest = %x, want empty", rest)
+	}
+
+	if len(fragments) != 1 {
+		t.Fatalf("completed %d fragments, want 1", len(fragments))
+	}
+
+	checkReadFragment(t, fragments[0], 3)
+}
+
+// TestAssemblePayload_singleFrame covers a payload holding one self-contained
+// FIR+FIN frame.
+func TestAssemblePayload_singleFrame(t *testing.T) {
+	t.Parallel()
+
+	payload := wirePayload(t, masterSegment(true, true, 0, readClass1230Fragment))
+
+	assembler := &dnp3.Assembler{}
+
+	frames, fragments, rest, err := assembler.AssemblePayload(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(frames) != 1 || len(fragments) != 1 || len(rest) != 0 {
+		t.Fatalf("frames=%d fragments=%d rest=%d, want 1/1/0",
+			len(frames), len(fragments), len(rest))
+	}
+
+	checkReadFragment(t, fragments[0], 1)
+}
+
+// TestAssemblePayload_splitAcrossPayloads verifies the assembler carries state
+// between calls when a fragment spans two reads.
+func TestAssemblePayload_splitAcrossPayloads(t *testing.T) {
+	t.Parallel()
+
+	assembler := &dnp3.Assembler{}
+
+	first := wirePayload(t, masterSegment(true, false, 5, readClass1230Fragment[:4]))
+
+	_, fragments, _, err := assembler.AssemblePayload(first)
+	if err != nil {
+		t.Fatalf("unexpected error on first payload: %v", err)
+	}
+
+	if len(fragments) != 0 {
+		t.Fatalf("completed %d fragments on first payload, want 0", len(fragments))
+	}
+
+	second := wirePayload(t, masterSegment(false, true, 6, readClass1230Fragment[4:]))
+
+	_, fragments, _, err = assembler.AssemblePayload(second)
+	if err != nil {
+		t.Fatalf("unexpected error on second payload: %v", err)
+	}
+
+	if len(fragments) != 1 {
+		t.Fatalf("completed %d fragments on second payload, want 1", len(fragments))
+	}
+
+	checkReadFragment(t, fragments[0], 2)
+}
+
+// TestAssemblePayload_trailingPartial verifies a whole frame plus an incomplete
+// trailing frame surfaces the parsed frame and the leftover bytes without error.
+func TestAssemblePayload_trailingPartial(t *testing.T) {
+	t.Parallel()
+
+	whole := wirePayload(t, masterSegment(true, false, 0, readClass1230Fragment[:4]))
+	partial := []byte{0x05, 0x64, 0x10, 0xc4} // a fresh start byte pair, truncated
+	payload := append(append([]byte{}, whole...), partial...)
+
+	assembler := &dnp3.Assembler{}
+
+	frames, fragments, rest, err := assembler.AssemblePayload(payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(frames) != 1 {
+		t.Fatalf("parsed %d frames, want 1", len(frames))
+	}
+
+	if len(fragments) != 0 {
+		t.Fatalf("completed %d fragments, want 0 (FIR only)", len(fragments))
+	}
+
+	if !slices.Equal(rest, partial) {
+		t.Fatalf("rest = %x, want %x", rest, partial)
+	}
+}
+
+// TestAssemblePayload_orphanError verifies an Assemble error stops consumption
+// and is returned.
+func TestAssemblePayload_orphanError(t *testing.T) {
+	t.Parallel()
+
+	payload := wirePayload(t, masterSegment(false, true, 7, readClass1230Fragment))
+
+	assembler := &dnp3.Assembler{}
+
+	_, fragments, _, err := assembler.AssemblePayload(payload)
+	if !errors.Is(err, dnp3.ErrOrphanSegment) {
+		t.Fatalf("expected ErrOrphanSegment, got %v", err)
+	}
+
+	if len(fragments) != 0 {
+		t.Fatalf("completed %d fragments, want 0", len(fragments))
+	}
+}

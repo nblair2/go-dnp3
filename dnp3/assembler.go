@@ -126,6 +126,37 @@ func (asm *Assembler) Assemble(frame *Frame) (*Fragment, error) {
 	return asm.complete(key, state, frame)
 }
 
+// AssemblePayload parses every complete DNP3 link frame from a byte slice
+// (typically one TCP read) and feeds them, in wire order, into the Assembler.
+// It returns the frames parsed, every application fragment that completed while
+// consuming them, any trailing partial-frame bytes (to prepend to the next
+// read), and the first error encountered.
+//
+// Prefer this over Assemble when a read may hold more than one link frame: a
+// fragment whose transport segments are concatenated into a single payload is
+// then reassembled in one call, rather than silently stalling if only the first
+// frame is fed. A parse error (malformed length or CRC) or an Assemble error
+// (ErrOrphanSegment, ErrSequenceMismatch, ErrFragmentTooLarge) stops
+// consumption and is returned with whatever frames and fragments came first.
+func (asm *Assembler) AssemblePayload(payload []byte) ([]*Frame, []*Fragment, []byte, error) {
+	frames, rest, err := ParseFrames(payload)
+
+	var fragments []*Fragment
+
+	for _, frame := range frames {
+		fragment, assembleErr := asm.Assemble(frame)
+		if assembleErr != nil {
+			return frames, fragments, rest, assembleErr
+		}
+
+		if fragment != nil {
+			fragments = append(fragments, fragment)
+		}
+	}
+
+	return frames, fragments, rest, err
+}
+
 // session returns the state a segment belongs to, starting a new fragment on
 // FIR and otherwise requiring an in-progress fragment with a matching SEQ.
 func (asm *Assembler) session(key SessionKey, frame *Frame) (*fragmentState, error) {
