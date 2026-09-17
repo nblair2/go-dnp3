@@ -162,6 +162,13 @@ func (do *DataObject) DecodeFromBytes(data []byte) error {
 		return do.markUnsupported(data, headSize)
 	}
 
+	// TODO: Group 87 Var 1 is only implemented for Count1Variable.
+	// Need to noodle on this.
+	if do.Header.Group == 87 && do.Header.Variation == 1 &&
+		do.Header.RangeSpecCode != Count1Variable {
+		return do.markUnsupported(data, headSize)
+	}
+
 	var size int
 
 	do.Points, size, err = do.Header.objectType.Constructor(
@@ -316,10 +323,7 @@ func (do *DataObject) updateIndexesFromPrefix() error {
 
 		return nil
 	case Size1Octet, Size2Octet, Size4Octet:
-		return fmt.Errorf(
-			"point prefix code %s does not determine indexes",
-			do.Header.PointPrefixCode,
-		)
+		return nil
 	case Reserved:
 		return errors.New("reserved point prefix code cannot be used to determine indexes")
 	default:

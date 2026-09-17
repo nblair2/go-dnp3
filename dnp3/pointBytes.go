@@ -556,6 +556,70 @@ func makeBytesConstructor(layout pointBytesLayout, width int) PointsConstructor 
 	}
 }
 
+// makeVariableBytesConstructor creates PointBytes values whose widths are
+// declared by per-point size prefixes.
+func makeVariableBytesConstructor(layout pointBytesLayout) PointsConstructor {
+	newPoint := newPointBytesWithLayout(layout, 0)
+
+	return func(data []byte, num, prefSize int, prefCode PointPrefixCode) ([]Point, int, error) {
+		return newPointsBytesVariable(newPoint, data, num, prefSize, prefCode)
+	}
+}
+
+func newPointsBytesVariable(
+	newPoint func() *PointBytes,
+	data []byte,
+	num, prefSize int,
+	prefCode PointPrefixCode,
+) ([]Point, int, error) {
+	if !slices.Contains([]PointPrefixCode{Size1Octet, Size2Octet, Size4Octet}, prefCode) {
+		return nil, 0, fmt.Errorf("variable-size points require a size prefix, got %s", prefCode)
+	}
+
+	pointsOut := make([]Point, 0, num)
+	offset := 0
+
+	for pointIndex := range num {
+		if len(data)-offset < prefSize {
+			return pointsOut, offset, fmt.Errorf(
+				"not enough bytes for point %d size prefix: need %d, have %d",
+				pointIndex, prefSize, len(data)-offset,
+			)
+		}
+
+		pointSize, err := prefixToInt(data[offset : offset+prefSize])
+		if err != nil {
+			return pointsOut, offset, fmt.Errorf(
+				"could not decode point %d size: %w",
+				pointIndex,
+				err,
+			)
+		}
+
+		valueOffset := offset + prefSize
+		if pointSize < 0 || pointSize > len(data)-valueOffset {
+			return pointsOut, offset, fmt.Errorf(
+				"not enough bytes for point %d value: need %d, have %d",
+				pointIndex, pointSize, len(data)-valueOffset,
+			)
+		}
+
+		pointEnd := valueOffset + pointSize
+		point := newPoint()
+		point.sizeSize = prefSize
+
+		err = point.DecodeFromBytes(data[offset:pointEnd], prefSize)
+		if err != nil {
+			return pointsOut, offset, fmt.Errorf("could not decode point %d: %w", pointIndex, err)
+		}
+
+		pointsOut = append(pointsOut, point)
+		offset = pointEnd
+	}
+
+	return pointsOut, offset, nil
+}
+
 func newPointsBytesGeneric(
 	newPoint func() *PointBytes,
 	data []byte,

@@ -619,4 +619,11 @@ var objectTypes = map[groupVariation]*objectType{
 		Constructor: makeBytesConstructor(layoutValue, 1),
 		Packer:      packPointsBytes,
 	},
+
+	// Data-Set Present Value
+	{87, 1}: {
+		Description: "(Static) Data-Set Present Value",
+		Constructor: makeVariableBytesConstructor(layoutValue),
+		Packer:      packPointsBytes,
+	},
 }
