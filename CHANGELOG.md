@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.0](https://github.com/nblair2/go-dnp3/compare/v4.0.0...v4.1.0) (2026-09-17)
+
+
+### Features
+
+* **G87V1:** Data Set Present Value ([#76](https://github.com/nblair2/go-dnp3/issues/76)) ([5742e7c](https://github.com/nblair2/go-dnp3/commit/5742e7cae728cf950685ea8ba5c5c397557a1388))
+
 ## [4.0.0](https://github.com/nblair2/go-dnp3/compare/v3.0.0...v4.0.0) (2026-08-30)
 
 
