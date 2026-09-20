@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.1.1](https://github.com/nblair2/go-dnp3/compare/v4.1.0...v4.1.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* **assembler:** keep partially decoded Application on errors ([#81](https://github.com/nblair2/go-dnp3/issues/81)) ([d8fbae0](https://github.com/nblair2/go-dnp3/commit/d8fbae0e37a57c733605682bae005e5f095c78c5))
+
 ## [4.1.0](https://github.com/nblair2/go-dnp3/compare/v4.0.0...v4.1.0) (2026-09-17)
 
 
