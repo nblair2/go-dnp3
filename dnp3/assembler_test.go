@@ -149,6 +149,53 @@ func TestAssembler_twoSegments(t *testing.T) {
 	}
 }
 
+// TestAssembler_partialDecodeUnsupportedObject covers a fragment whose
+// application data contains a supported object followed by one from an
+// unknown group. Assemble must still return the fragment (Data intact,
+// Application holding the decoded leading object plus the raw tail), paired
+// with the wrapped decode error, rather than discarding it.
+func TestAssembler_partialDecodeUnsupportedObject(t *testing.T) {
+	t.Parallel()
+
+	// control, FC=Read, [group 60 var 1, qualifier 0x06: supported, no
+	// points], [group 255 var 0, qualifier 0x06: unknown group, unsupported].
+	payload := []byte{0xc5, 0x01, 0x3c, 0x01, 0x06, 0xff, 0x00, 0x06}
+
+	assembler := &dnp3.Assembler{}
+
+	fragment, err := assembler.Assemble(masterSegment(true, true, 0, payload))
+	if !errors.Is(err, dnp3.ErrUnsupportedObject) {
+		t.Fatalf("Assemble error = %v, want ErrUnsupportedObject", err)
+	}
+
+	if fragment == nil {
+		t.Fatal("expected a fragment alongside the decode error, got nil")
+	}
+
+	if !slices.Equal(fragment.Data, payload) {
+		t.Fatalf("Data = % X, want % X", fragment.Data, payload)
+	}
+
+	if fragment.Application == nil {
+		t.Fatal("expected Application to hold the partially decoded result, got nil")
+	}
+
+	data := fragment.Application.GetData()
+
+	if len(data.Objects) != 1 {
+		t.Fatalf("Objects = %d, want 1 (the supported leading object)", len(data.Objects))
+	}
+
+	if data.Objects[0].Header.Group != 60 || data.Objects[0].Header.Variation != 1 {
+		t.Fatalf("decoded object = group %d var %d, want group 60 var 1",
+			data.Objects[0].Header.Group, data.Objects[0].Header.Variation)
+	}
+
+	if !slices.Equal(data.GetExtra(), []byte{0xff, 0x00, 0x06}) {
+		t.Fatalf("Extra = % X, want the unsupported object's raw bytes", data.GetExtra())
+	}
+}
+
 func TestAssembler_response(t *testing.T) {
 	t.Parallel()
 
@@ -566,5 +613,44 @@ func TestAssemblePayload_orphanError(t *testing.T) {
 
 	if len(fragments) != 0 {
 		t.Fatalf("completed %d fragments, want 0", len(fragments))
+	}
+}
+
+// TestAssemblePayload_partialFragmentOnDecodeError verifies that a fragment
+// which completes with an application-decode error (rather than a transport
+// rule violation) is still returned in fragments, not dropped, since its
+// leading decoded objects and raw tail both remain usable.
+func TestAssemblePayload_partialFragmentOnDecodeError(t *testing.T) {
+	t.Parallel()
+
+	// control, FC=Read, [group 60 var 1, qualifier 0x06: supported, no
+	// points], [group 255 var 0, qualifier 0x06: unknown group, unsupported].
+	data := []byte{0xc5, 0x01, 0x3c, 0x01, 0x06, 0xff, 0x00, 0x06}
+
+	payload := wirePayload(t,
+		masterSegment(true, false, 0, data[:4]),
+		masterSegment(false, true, 1, data[4:]),
+	)
+
+	assembler := &dnp3.Assembler{}
+
+	_, fragments, _, err := assembler.AssemblePayload(payload)
+	if !errors.Is(err, dnp3.ErrUnsupportedObject) {
+		t.Fatalf("expected ErrUnsupportedObject, got %v", err)
+	}
+
+	if len(fragments) != 1 {
+		t.Fatalf(
+			"completed %d fragments, want 1 (returned despite the decode error)",
+			len(fragments),
+		)
+	}
+
+	if !slices.Equal(fragments[0].Data, data) {
+		t.Fatalf("Data = % X, want % X", fragments[0].Data, data)
+	}
+
+	if fragments[0].Application == nil {
+		t.Fatal("expected the partially decoded Application to be preserved")
 	}
 }
