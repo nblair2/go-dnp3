@@ -33,7 +33,8 @@ func NewApplicationRequestFromBytes(data []byte) (*ApplicationRequest, error) {
 
 func (appreq *ApplicationRequest) DecodeFromBytes(data []byte) error {
 	if len(data) < 2 {
-		return fmt.Errorf("application request requires at least 2 bytes, got %d", len(data))
+		return fmt.Errorf("application request requires at least 2 bytes, got %d: %w",
+			len(data), ErrInsufficientData)
 	}
 
 	appreq.Control.FromByte(data[0])
@@ -95,7 +96,7 @@ func (appreq *ApplicationRequest) GetSequence() uint8 {
 
 func (appreq *ApplicationRequest) SetSequence(s uint8) error {
 	if s > 0b00001111 {
-		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
+		return fmt.Errorf("application sequence is only 4 bits, got %d: %w", s, ErrValueOutOfRange)
 	}
 
 	appreq.Control.Sequence = s

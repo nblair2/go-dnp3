@@ -1,7 +1,6 @@
 package dnp3
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -214,8 +213,9 @@ func (do *DataObject) SerializeTo() ([]byte, error) {
 		if packer == nil {
 			encoded = append(encoded, do.Extra...)
 
-			return encoded, fmt.Errorf("no packer for Group %d, Var %d",
-				do.Header.Group, do.Header.Variation)
+			return encoded, fmt.Errorf("no packer for Group %d, Var %d: %w",
+				do.Header.Group, do.Header.Variation,
+				&UnsupportedObjectError{Group: do.Header.Group, Variation: do.Header.Variation})
 		}
 
 		packedPoints, err := packer(do.Points)
@@ -276,8 +276,7 @@ func (do *DataObject) markUnsupported(data []byte, headSize int) error {
 	do.Extra = data[headSize:]
 	do.totalSize += len(do.Extra)
 
-	return fmt.Errorf("unsupported group/variation: %d/%d",
-		do.Header.Group, do.Header.Variation)
+	return &UnsupportedObjectError{Group: do.Header.Group, Variation: do.Header.Variation}
 }
 
 func (do *DataObject) updateIndexes() error {
@@ -297,7 +296,11 @@ func (do *DataObject) updateIndexes() error {
 	case *CountRangeField:
 		return do.updateIndexesFromPrefix()
 	default:
-		return fmt.Errorf("unexpected range field type %T", do.Header.RangeField)
+		return fmt.Errorf(
+			"unexpected range field type %T: %w",
+			do.Header.RangeField,
+			ErrInvalidType,
+		)
 	}
 }
 
@@ -325,8 +328,15 @@ func (do *DataObject) updateIndexesFromPrefix() error {
 	case Size1Octet, Size2Octet, Size4Octet:
 		return nil
 	case Reserved:
-		return errors.New("reserved point prefix code cannot be used to determine indexes")
+		return fmt.Errorf(
+			"reserved point prefix code cannot be used to determine indexes: %w",
+			ErrInvalidQualifier,
+		)
 	default:
-		return fmt.Errorf("unexpected point prefix code %d", do.Header.PointPrefixCode)
+		return fmt.Errorf(
+			"unexpected point prefix code %d: %w",
+			do.Header.PointPrefixCode,
+			ErrInvalidQualifier,
+		)
 	}
 }

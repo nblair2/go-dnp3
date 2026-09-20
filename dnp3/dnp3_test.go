@@ -2,6 +2,7 @@ package dnp3_test
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -403,8 +404,8 @@ func TestDecodingLayer_truncated(t *testing.T) {
 			var frame dnp3.Frame
 
 			err := frame.DecodeFromBytes(testCase.data, feedback)
-			if err == nil {
-				t.Fatal("expected error on truncated input")
+			if !errors.Is(err, dnp3.ErrInsufficientData) {
+				t.Fatalf("error = %v, want ErrInsufficientData", err)
 			}
 
 			if !feedback.truncated {
@@ -477,18 +478,18 @@ func TestDecode_shortInput(t *testing.T) {
 	t.Parallel()
 
 	_, err := dnp3.NewDataLinkFromBytes([]byte{0x05})
-	if err == nil {
-		t.Error("NewDataLinkFromBytes: expected error on short input")
+	if !errors.Is(err, dnp3.ErrInsufficientData) {
+		t.Errorf("NewDataLinkFromBytes: got %v, want ErrInsufficientData", err)
 	}
 
 	_, _, err = dnp3.NewTransportFromBytes([]byte{})
-	if err == nil {
-		t.Error("NewTransportFromBytes: expected error on empty input")
+	if !errors.Is(err, dnp3.ErrInsufficientData) {
+		t.Errorf("NewTransportFromBytes: got %v, want ErrInsufficientData", err)
 	}
 
 	_, err = dnp3.NewApplicationResponseFromBytes([]byte{0x81, 0x00})
-	if err == nil {
-		t.Error("NewApplicationResponseFromBytes: expected error on short input")
+	if !errors.Is(err, dnp3.ErrInsufficientData) {
+		t.Errorf("NewApplicationResponseFromBytes: got %v, want ErrInsufficientData", err)
 	}
 
 	// A valid 16-byte block plus CRC (18 bytes) followed by a lone trailing
@@ -496,8 +497,8 @@ func TestDecode_shortInput(t *testing.T) {
 	misaligned := append(dnp3.InsertDNP3CRCs(make([]byte, 16)), 0x00)
 
 	_, _, err = dnp3.RemoveDNP3CRCs(misaligned)
-	if err == nil {
-		t.Error("RemoveDNP3CRCs: expected error on truncated trailing block")
+	if !errors.Is(err, dnp3.ErrInsufficientData) {
+		t.Errorf("RemoveDNP3CRCs: got %v, want ErrInsufficientData", err)
 	}
 }
 
@@ -551,8 +552,8 @@ func TestSetSequence_max(t *testing.T) {
 	}
 
 	err = req.SetSequence(16)
-	if err == nil {
-		t.Error("request SetSequence(16): expected error")
+	if !errors.Is(err, dnp3.ErrValueOutOfRange) {
+		t.Errorf("request SetSequence(16): got %v, want ErrValueOutOfRange", err)
 	}
 
 	resp := dnp3.NewApplicationResponse()
@@ -563,7 +564,7 @@ func TestSetSequence_max(t *testing.T) {
 	}
 
 	err = resp.SetSequence(16)
-	if err == nil {
-		t.Error("response SetSequence(16): expected error")
+	if !errors.Is(err, dnp3.ErrValueOutOfRange) {
+		t.Errorf("response SetSequence(16): got %v, want ErrValueOutOfRange", err)
 	}
 }

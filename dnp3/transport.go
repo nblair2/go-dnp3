@@ -1,7 +1,6 @@
 package dnp3
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -42,7 +41,7 @@ func NewTransportFromBytes(data []byte) (*Transport, []byte, error) {
 
 func (trans *Transport) DecodeFromBytes(data []byte) ([]byte, error) {
 	if len(data) < 1 {
-		return nil, errors.New("transport layer requires at least 1 byte")
+		return nil, fmt.Errorf("transport layer requires at least 1 byte: %w", ErrInsufficientData)
 	}
 
 	crcs, clean, err := RemoveDNP3CRCs(data)
@@ -71,7 +70,11 @@ func (trans *Transport) ToByte() (byte, error) {
 	}
 
 	if trans.Sequence > 63 {
-		return 0, fmt.Errorf("transport sequence number %d exceeds 6 bits", trans.Sequence)
+		return 0, fmt.Errorf(
+			"transport sequence number %d exceeds 6 bits: %w",
+			trans.Sequence,
+			ErrValueOutOfRange,
+		)
 	}
 
 	transportByte |= (trans.Sequence & 0b00111111)

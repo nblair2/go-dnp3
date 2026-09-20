@@ -1,9 +1,9 @@
 package dnp3_test
 
 import (
+	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/nblair2/go-dnp3/v4/dnp3"
@@ -105,11 +105,12 @@ func TestReadAllVariationZero_unknownGroup(t *testing.T) {
 	request := &dnp3.ApplicationRequest{}
 
 	err := request.DecodeFromBytes(readAllRequest(255))
-	if err == nil {
-		t.Fatal("expected an error for an unknown group/variation")
+	if !errors.Is(err, dnp3.ErrUnsupportedObject) {
+		t.Fatalf("DecodeFromBytes: got %v, want ErrUnsupportedObject", err)
 	}
 
-	if !strings.Contains(err.Error(), "unsupported group/variation") {
-		t.Fatalf("error = %v, want it to mention unsupported group/variation", err)
+	var unsupported *dnp3.UnsupportedObjectError
+	if !errors.As(err, &unsupported) || unsupported.Group != 255 || unsupported.Variation != 0 {
+		t.Fatalf("unsupported object details: got %+v, want group 255, variation 0", unsupported)
 	}
 }

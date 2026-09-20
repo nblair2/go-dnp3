@@ -109,7 +109,7 @@ type PointFlags struct {
 func (f *PointFlags) FromByte(data byte) error {
 	f.Reserved = data&0b10000000 != 0
 	if f.Reserved {
-		return errors.New("reserved bit must be 0")
+		return fmt.Errorf("reserved bit must be 0: %w", ErrReservedBits)
 	}
 
 	f.ReferenceCheck = data&0b01000000 != 0
@@ -192,7 +192,11 @@ func prefixToInt(prefix []byte) (int, error) {
 	case 4:
 		return int(binary.LittleEndian.Uint32(prefix)), nil
 	default:
-		return 0, fmt.Errorf("unsupported prefix size: %d bytes", len(prefix))
+		return 0, fmt.Errorf(
+			"unsupported prefix size: %d bytes: %w",
+			len(prefix),
+			ErrInvalidQualifier,
+		)
 	}
 }
 
@@ -202,14 +206,22 @@ func intToPrefixSized(value int, size int) ([]byte, error) {
 	switch size {
 	case 1:
 		if value > 0xFF {
-			return nil, fmt.Errorf("value %d exceeds 1-byte index max (255)", value)
+			return nil, fmt.Errorf(
+				"value %d exceeds 1-byte index max (255): %w",
+				value,
+				ErrValueOutOfRange,
+			)
 		}
 
 		// #nosec G115 -- value range is clamped above
 		return []byte{byte(value)}, nil
 	case 2:
 		if value > 0xFFFF {
-			return nil, fmt.Errorf("value %d exceeds 2-byte index max (65535)", value)
+			return nil, fmt.Errorf(
+				"value %d exceeds 2-byte index max (65535): %w",
+				value,
+				ErrValueOutOfRange,
+			)
 		}
 
 		b := make([]byte, 2)
@@ -219,7 +231,11 @@ func intToPrefixSized(value int, size int) ([]byte, error) {
 		return b, nil
 	case 3:
 		if value > 0xFFFFFF {
-			return nil, fmt.Errorf("value %d exceeds 3-byte index max (16777215)", value)
+			return nil, fmt.Errorf(
+				"value %d exceeds 3-byte index max (16777215): %w",
+				value,
+				ErrValueOutOfRange,
+			)
 		}
 
 		b := make([]byte, 4)
@@ -234,7 +250,7 @@ func intToPrefixSized(value int, size int) ([]byte, error) {
 
 		return b, nil
 	default:
-		return nil, fmt.Errorf("unsupported index size: %d bytes", size)
+		return nil, fmt.Errorf("unsupported index size: %d bytes: %w", size, ErrInvalidQualifier)
 	}
 }
 
@@ -243,7 +259,11 @@ func intToPrefixSized(value int, size int) ([]byte, error) {
 // minimal DNP3 prefix width (1, 2, or 4 bytes) is chosen automatically.
 func intToPrefix(value int, size int) ([]byte, error) {
 	if value < 0 {
-		return nil, fmt.Errorf("index value must be non-negative, got %d", value)
+		return nil, fmt.Errorf(
+			"index value must be non-negative, got %d: %w",
+			value,
+			ErrValueOutOfRange,
+		)
 	}
 
 	if size == 0 {
@@ -264,7 +284,7 @@ func intToPrefix(value int, size int) ([]byte, error) {
 // the encoding width if one has not been set.
 func setIndex(index **int, indexSize *int, value int) error {
 	if value < 0 {
-		return fmt.Errorf("index must be non-negative, got %d", value)
+		return fmt.Errorf("index must be non-negative, got %d: %w", value, ErrValueOutOfRange)
 	}
 
 	if *indexSize > 0 {
@@ -307,7 +327,7 @@ func packPointsBytes(points []Point) ([]byte, error) {
 
 func constructorNoPoints(_ []byte, num, _ int, _ PointPrefixCode) ([]Point, int, error) {
 	if num != 0 {
-		return nil, 0, fmt.Errorf("no points expected, got %d", num)
+		return nil, 0, fmt.Errorf("no points expected, got %d: %w", num, ErrInvalidLength)
 	}
 
 	return nil, 0, nil
@@ -315,7 +335,7 @@ func constructorNoPoints(_ []byte, num, _ int, _ PointPrefixCode) ([]Point, int,
 
 func packNoPoints(points []Point) ([]byte, error) {
 	if len(points) != 0 {
-		return nil, fmt.Errorf("no points expected, got %d", len(points))
+		return nil, fmt.Errorf("no points expected, got %d: %w", len(points), ErrInvalidLength)
 	}
 
 	return nil, nil

@@ -213,8 +213,8 @@ func (*Assembler) complete(key SessionKey, state *fragmentState, frame *Frame) (
 	}
 
 	if len(fragment.Data) < 2 {
-		return fragment, fmt.Errorf("application fragment too short: %d bytes",
-			len(fragment.Data))
+		return fragment, fmt.Errorf("application fragment too short: %d bytes: %w",
+			len(fragment.Data), ErrInsufficientData)
 	}
 
 	var app Application
