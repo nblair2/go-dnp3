@@ -1,9 +1,6 @@
 package dnp3
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // ObjectHeader is used to describe the structure of application data.
 type ObjectHeader struct {
@@ -39,7 +36,11 @@ func NewObjectHeaderFromBytes(data []byte) (*ObjectHeader, error) {
 
 func (oh *ObjectHeader) DecodeFromBytes(data []byte) error {
 	if len(data) < 3 {
-		return fmt.Errorf("object headers are at 3 - 11 bytes, got %d", len(data))
+		return fmt.Errorf(
+			"object headers are at 3 - 11 bytes, got %d: %w",
+			len(data),
+			ErrInsufficientData,
+		)
 	}
 
 	oh.Group = data[0]
@@ -63,11 +64,8 @@ func (oh *ObjectHeader) DecodeFromBytes(data []byte) error {
 	consumed := 3 + rangeFieldBytes
 
 	if len(data) < consumed {
-		return fmt.Errorf(
-			"can't create range field: need %d bytes, got %d",
-			consumed,
-			len(data),
-		)
+		return fmt.Errorf("can't create range field: need %d bytes, got %d: %w",
+			consumed, len(data), ErrInsufficientData)
 	}
 
 	err = rangeField.DecodeFromBytes(data[3:consumed])
@@ -79,7 +77,7 @@ func (oh *ObjectHeader) DecodeFromBytes(data []byte) error {
 	oh.size = consumed
 
 	if oh.Reserved {
-		return errors.New("first qualifier octet bit must be 0")
+		return fmt.Errorf("first qualifier octet bit must be 0: %w", ErrReservedBits)
 	}
 
 	return nil
@@ -101,7 +99,7 @@ func (oh *ObjectHeader) SerializeTo() ([]byte, error) {
 	encoded = append(encoded, qualifierByte)
 
 	if oh.RangeField == nil {
-		return nil, errors.New("range field is nil")
+		return nil, fmt.Errorf("range field is nil: %w", ErrMissingField)
 	}
 
 	rangeBytes, err := oh.RangeField.SerializeTo()

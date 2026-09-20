@@ -1,9 +1,6 @@
 package dnp3
 
-import (
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 // Point2Bits is a 2-bit Point implementation for packed double-bit binary
 // inputs. Points are bit-packed with 4 points per byte.
@@ -16,9 +13,9 @@ func (p *Point2Bits) DataType() PointDataType { return PointDataType2Bits }
 // DecodeFromBytes should not be used directly.
 func (p *Point2Bits) DecodeFromBytes(data []byte, prefSize int) error {
 	if len(data) > 1 {
-		return errors.New("can't construct 2 bit point from multiple bytes")
+		return fmt.Errorf("can't construct 2 bit point from multiple bytes: %w", ErrInvalidLength)
 	} else if prefSize != 0 {
-		return errors.New("can't have prefix on 2 bit packed points")
+		return fmt.Errorf("can't have prefix on 2 bit packed points: %w", ErrInvalidQualifier)
 	}
 	// assume bit is the lowest order
 	p.Value = [2]bool{
@@ -68,7 +65,7 @@ func (p *Point2Bits) SetRelTime(RelativeTime) error     { return ErrNoRelTime }
 func (p *Point2Bits) SetValue(v any) error {
 	val, ok := v.([2]bool)
 	if !ok {
-		return fmt.Errorf("Point2Bits value must be [2]bool, got %T", v)
+		return fmt.Errorf("Point2Bits value must be [2]bool, got %T: %w", v, ErrInvalidType)
 	}
 
 	p.Value = val
@@ -80,9 +77,13 @@ func (p *Point2Bits) SetValue(v any) error {
 
 func newPoints2Bits(data []byte, num, prefSize int, _ PointPrefixCode) ([]Point, int, error) {
 	if num > (8*len(data))/2 {
-		return nil, 0, fmt.Errorf("not enough bytes for %d bit points", num)
+		return nil, 0, fmt.Errorf(
+			"not enough bytes for %d bit points: %w",
+			num,
+			ErrInsufficientData,
+		)
 	} else if prefSize != 0 {
-		return nil, 0, errors.New("can't have a prefix for 2 bit packed")
+		return nil, 0, fmt.Errorf("can't have a prefix for 2 bit packed: %w", ErrInvalidQualifier)
 	}
 
 	var (
@@ -123,9 +124,10 @@ func packerPoints2Bits(points []Point) ([]byte, error) {
 			point, ok := points[elementIndex].(*Point2Bits)
 			if !ok {
 				return packed, fmt.Errorf(
-					"element %d is not *Point2Bits, got %T",
+					"element %d is not *Point2Bits, got %T: %w",
 					elementIndex,
 					points[elementIndex],
+					ErrInvalidType,
 				)
 			}
 

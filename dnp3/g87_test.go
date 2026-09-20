@@ -1,8 +1,8 @@
 package dnp3_test
 
 import (
+	"errors"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/nblair2/go-dnp3/v4/dnp3"
@@ -153,17 +153,17 @@ func TestGroup87Variation1RejectsMalformedValues(t *testing.T) {
 	testCases := []struct {
 		name    string
 		raw     []byte
-		wantErr string
+		wantErr error
 	}{
 		{
 			name:    "missing size prefix byte",
 			raw:     []byte{0x57, 0x01, 0x5b, 0x01, 0x0a},
-			wantErr: "not enough bytes for point 0 size prefix",
+			wantErr: dnp3.ErrInsufficientData,
 		},
 		{
 			name:    "declared value exceeds input",
 			raw:     []byte{0x57, 0x01, 0x5b, 0x01, 0x0a, 0x00, 0x01},
-			wantErr: "not enough bytes for point 0 value",
+			wantErr: dnp3.ErrInsufficientData,
 		},
 		{
 			name: "second value exceeds input",
@@ -172,17 +172,17 @@ func TestGroup87Variation1RejectsMalformedValues(t *testing.T) {
 				0x01, 0x00, 0xaa,
 				0x02, 0x00, 0xbb,
 			},
-			wantErr: "not enough bytes for point 1 value",
+			wantErr: dnp3.ErrInsufficientData,
 		},
 		{
 			name:    "indexless variable value",
 			raw:     []byte{0x57, 0x01, 0x07, 0x01},
-			wantErr: "unsupported group/variation: 87/1",
+			wantErr: dnp3.ErrUnsupportedObject,
 		},
 		{
 			name:    "descriptor-dependent indexed value",
 			raw:     []byte{0x57, 0x01, 0x17, 0x01, 0x00, 0x01},
-			wantErr: "unsupported group/variation: 87/1",
+			wantErr: dnp3.ErrUnsupportedObject,
 		},
 	}
 
@@ -191,12 +191,8 @@ func TestGroup87Variation1RejectsMalformedValues(t *testing.T) {
 			t.Parallel()
 
 			_, err := dnp3.NewDataObjectFromBytes(testCase.raw)
-			if err == nil {
-				t.Fatal("NewDataObjectFromBytes: expected error, got nil")
-			}
-
-			if !strings.Contains(err.Error(), testCase.wantErr) {
-				t.Fatalf("error: got %q, want substring %q", err, testCase.wantErr)
+			if !errors.Is(err, testCase.wantErr) {
+				t.Fatalf("NewDataObjectFromBytes: got %v, want %v", err, testCase.wantErr)
 			}
 		})
 	}

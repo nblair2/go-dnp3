@@ -38,18 +38,22 @@ func NewDataLinkFromBytes(data []byte) (*DataLink, error) {
 
 func (dl *DataLink) DecodeFromBytes(data []byte) error {
 	if len(data) < 10 {
-		return fmt.Errorf("data link header requires at least 10 bytes, got %d", len(data))
+		return fmt.Errorf("data link header requires at least 10 bytes, got %d: %w",
+			len(data), ErrInsufficientData)
 	}
 
 	if data[0] != 0x05 || data[1] != 0x64 {
 		return fmt.Errorf(
-			"first 2 bytes %#X don't match the magic bytes (0x0564)", data[:2])
+			"first 2 bytes %#X don't match the magic bytes (0x0564): %w",
+			data[:2],
+			ErrInvalidStartBytes,
+		)
 	}
 
 	crc := CalculateDNP3CRC(data[:8])
 	if !slices.Equal(crc, data[8:10]) {
-		return fmt.Errorf(
-			"data link checksum %#X doesn't match CRC (%#X)", crc, data[8:10])
+		return fmt.Errorf("data link checksum %#X doesn't match CRC (%#X): %w",
+			data[8:10], crc, ErrCRCMismatch)
 	}
 
 	dl.Synchronize = [2]byte{0x05, 0x64}
@@ -76,7 +80,11 @@ func (dl *DataLink) SerializeTo() ([]byte, error) {
 
 	// LEN needs to be updated externally
 	if dl.Length > 255 {
-		return nil, fmt.Errorf("length %d exceeds max byte value", dl.Length)
+		return nil, fmt.Errorf(
+			"length %d exceeds max byte value: %w",
+			dl.Length,
+			ErrValueOutOfRange,
+		)
 	}
 
 	out = append(out, dl.Synchronize[:]...)
@@ -126,14 +134,19 @@ func (dlctl *DataLinkControl) FromByte(value byte) error {
 	if dlctl.Primary {
 		code := DataLinkPrimaryFunctionCode(functionCode)
 		if !isValidPrimaryFunctionCode(code) {
-			return fmt.Errorf("unknown primary function code 0x%X", functionCode)
+			return fmt.Errorf(
+				"unknown primary function code 0x%X: %w",
+				functionCode,
+				ErrInvalidFunctionCode,
+			)
 		}
 
 		if !checkPrimaryFunctionCodeFCVValidity(code, dlctl.FrameCountValid) {
 			return fmt.Errorf(
-				"invalid FCV value %t for primary function code 0x%X",
+				"invalid FCV value %t for primary function code 0x%X: %w",
 				dlctl.FrameCountValid,
 				functionCode,
+				ErrInvalidControl,
 			)
 		}
 
@@ -141,7 +154,11 @@ func (dlctl *DataLinkControl) FromByte(value byte) error {
 	} else {
 		code := DataLinkSecondaryFunctionCode(functionCode)
 		if !isValidSecondaryFunctionCode(code) {
-			return fmt.Errorf("unknown secondary function code 0x%X", functionCode)
+			return fmt.Errorf(
+				"unknown secondary function code 0x%X: %w",
+				functionCode,
+				ErrInvalidFunctionCode,
+			)
 		}
 
 		dlctl.FunctionCode = code

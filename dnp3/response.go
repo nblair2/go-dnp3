@@ -1,7 +1,6 @@
 package dnp3
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -35,7 +34,8 @@ func NewApplicationResponseFromBytes(data []byte) (*ApplicationResponse, error) 
 
 func (appresp *ApplicationResponse) DecodeFromBytes(data []byte) error {
 	if len(data) < 4 {
-		return fmt.Errorf("application response requires at least 4 bytes, got %d", len(data))
+		return fmt.Errorf("application response requires at least 4 bytes, got %d: %w",
+			len(data), ErrInsufficientData)
 	}
 
 	appresp.Control.FromByte(data[0])
@@ -104,7 +104,7 @@ func (appresp *ApplicationResponse) GetSequence() uint8 {
 
 func (appresp *ApplicationResponse) SetSequence(s uint8) error {
 	if s > 0b00001111 {
-		return fmt.Errorf("application sequence is only 4 bits, got %d", s)
+		return fmt.Errorf("application sequence is only 4 bits, got %d: %w", s, ErrValueOutOfRange)
 	}
 
 	appresp.Control.Sequence = s
@@ -184,10 +184,13 @@ func NewApplicationInternalIndicationsFromBytes(
 
 func (appiin *ApplicationInternalIndications) DecodeFromBytes(data []byte) error {
 	if len(data) != 2 {
-		return fmt.Errorf(
-			"ApplicationInternalIndications requires exactly 2 bytes, got %d",
-			len(data),
-		)
+		cause := ErrInvalidLength
+		if len(data) < 2 {
+			cause = ErrInsufficientData
+		}
+
+		return fmt.Errorf("ApplicationInternalIndications requires exactly 2 bytes, got %d: %w",
+			len(data), cause)
 	}
 
 	lsb, msb := data[0], data[1]
@@ -210,7 +213,7 @@ func (appiin *ApplicationInternalIndications) DecodeFromBytes(data []byte) error
 
 	appiin.Reserved2 = (msb & 0b10000000) != 0
 	if (msb & 0b11000000) != 0 {
-		return errors.New("IIN 2.6 and 2.7 must be set to 0")
+		return fmt.Errorf("IIN 2.6 and 2.7 must be set to 0: %w", ErrReservedBits)
 	}
 
 	return nil

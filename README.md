@@ -19,6 +19,7 @@
 *   **Reassembly**: Use `dnp3.Assembler` to rebuild application fragments that span multiple transport segments, tracked per session (source, destination, direction). See `ExampleAssembler`, and `test/stream_test.go` for wiring it up to `gopacket/tcpassembly`.
 *   **Inspection**: Use `String()` for a human-readable, indented packet dump (excludes reserved fields and CRCs).
 *   **Serialization**: Full support for `json.Marshal()` to convert packets into machine-friendly JSON.
+    **Errors**: Use `errors.Is` to check library errors, not message strings. For unsupported objects, `errors.As` also exposes the group and variation through nested errors.
 
 ## Development
 

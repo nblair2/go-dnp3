@@ -56,7 +56,11 @@ func (appctl *ApplicationControl) ToByte() (byte, error) {
 	}
 
 	if appctl.Sequence > 15 {
-		return 0, fmt.Errorf("sequence number %d exceeds 4 bits", appctl.Sequence)
+		return 0, fmt.Errorf(
+			"sequence number %d exceeds 4 bits: %w",
+			appctl.Sequence,
+			ErrValueOutOfRange,
+		)
 	}
 
 	ctlByte |= (appctl.Sequence & 0b00001111)

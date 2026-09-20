@@ -1,7 +1,6 @@
 package dnp3
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -29,9 +28,9 @@ func (p *PointBit) DecodeFromBytes(data []byte, prefSize int) error {
 	}
 
 	if len(data) > 1 {
-		return errors.New("can't construct 1 bit point from multiple bytes")
+		return fmt.Errorf("can't construct 1 bit point from multiple bytes: %w", ErrInvalidLength)
 	} else if prefSize != 0 {
-		return errors.New("can't have a prefix on 1 bit packed points")
+		return fmt.Errorf("can't have a prefix on 1 bit packed points: %w", ErrInvalidQualifier)
 	}
 
 	p.Value = data[0]&0b00000001 != 0
@@ -125,7 +124,7 @@ func (p *PointBit) GetValue() any { return p.Value }
 func (p *PointBit) SetValue(v any) error {
 	val, ok := v.(bool)
 	if !ok {
-		return fmt.Errorf("PointBit value must be bool, got %T", v)
+		return fmt.Errorf("PointBit value must be bool, got %T: %w", v, ErrInvalidType)
 	}
 
 	p.Value = val
@@ -137,7 +136,10 @@ func (p *PointBit) SetValue(v any) error {
 
 func (p *PointBit) fromBytesFlags(data []byte, prefSize int) error {
 	if len(data) > 1+prefSize {
-		return errors.New("can't construct 1 bit point with flags from multiple bytes")
+		return fmt.Errorf(
+			"can't construct 1 bit point with flags from multiple bytes: %w",
+			ErrInvalidLength,
+		)
 	}
 
 	if prefSize > 0 {
@@ -193,9 +195,13 @@ func (p *PointBit) toBytesFlags() ([]byte, error) {
 
 func newPointsBit(data []byte, num, prefSize int, _ PointPrefixCode) ([]Point, int, error) {
 	if num > (8 * len(data)) {
-		return nil, 0, fmt.Errorf("not enough bytes for %d bit points", num)
+		return nil, 0, fmt.Errorf(
+			"not enough bytes for %d bit points: %w",
+			num,
+			ErrInsufficientData,
+		)
 	} else if prefSize != 0 {
-		return nil, 0, errors.New("prefix size must be 0 for packed bits")
+		return nil, 0, fmt.Errorf("prefix size must be 0 for packed bits: %w", ErrInvalidQualifier)
 	}
 
 	var mask uint8
@@ -223,8 +229,8 @@ func packerPointsBit(points []Point) ([]byte, error) {
 		for bitOffset := 0; bitOffset < 8 && pointOffset+bitOffset < len(points); bitOffset++ {
 			point, ok := points[pointOffset+bitOffset].(*PointBit)
 			if !ok {
-				return packed, fmt.Errorf("element %d is not *PointBit, got %T",
-					pointOffset+bitOffset, points[pointOffset+bitOffset])
+				return packed, fmt.Errorf("element %d is not *PointBit, got %T: %w",
+					pointOffset+bitOffset, points[pointOffset+bitOffset], ErrInvalidType)
 			}
 
 			if point.Value {
@@ -241,7 +247,11 @@ func packerPointsBit(points []Point) ([]byte, error) {
 func newPointsBitFlags(data []byte, num, prefSize int, _ PointPrefixCode) ([]Point, int, error) {
 	size := num * (prefSize + 1)
 	if size > len(data) {
-		return nil, 0, fmt.Errorf("not enough bytes for %d 1-bit points with flags", num)
+		return nil, 0, fmt.Errorf(
+			"not enough bytes for %d 1-bit points with flags: %w",
+			num,
+			ErrInsufficientData,
+		)
 	}
 
 	pointsOut := make([]Point, 0, num)

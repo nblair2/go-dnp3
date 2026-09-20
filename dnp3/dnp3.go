@@ -69,9 +69,10 @@ func ParseFrames(data []byte) ([]*Frame, []byte, error) {
 		total := frameWireSize(remaining[2])
 		if total == 0 {
 			return frames, remaining, fmt.Errorf(
-				"invalid DNP3 length byte %d at offset %d",
+				"invalid DNP3 length byte %d at offset %d: %w",
 				remaining[2],
 				pos,
+				ErrInvalidLength,
 			)
 		}
 
@@ -221,7 +222,8 @@ func (dnp *Frame) SerializeTo(buf gopacket.SerializeBuffer, _ gopacket.Serialize
 	totalLength := payloadLength + 5
 
 	if totalLength > math.MaxUint16 {
-		return fmt.Errorf("transport/application payload too large: %d bytes", payloadLength)
+		return fmt.Errorf("transport/application payload too large: %d bytes: %w",
+			payloadLength, ErrValueOutOfRange)
 	}
 
 	// #nosec G115 -- guarded by range check above
@@ -264,20 +266,20 @@ func (*Frame) checkFrameBounds(data []byte, feedback gopacket.DecodeFeedback) (i
 	if len(data) < 10 {
 		feedback.SetTruncated()
 
-		return 0, fmt.Errorf("not DNP3, only got %d bytes (need at least 10)",
-			len(data))
+		return 0, fmt.Errorf("not DNP3, only got %d bytes (need at least 10): %w",
+			len(data), ErrInsufficientData)
 	}
 
 	total := frameWireSize(data[2])
 	if total == 0 {
-		return 0, fmt.Errorf("invalid DNP3 length byte: %d", data[2])
+		return 0, fmt.Errorf("invalid DNP3 length byte: %d: %w", data[2], ErrInvalidLength)
 	}
 
 	if len(data) < total {
 		feedback.SetTruncated()
 
-		return 0, fmt.Errorf("truncated DNP3 frame: have %d bytes, need %d",
-			len(data), total)
+		return 0, fmt.Errorf("truncated DNP3 frame: have %d bytes, need %d: %w",
+			len(data), total, ErrInsufficientData)
 	}
 
 	return total, nil

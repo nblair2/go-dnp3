@@ -2,7 +2,6 @@ package dnp3
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 )
 
@@ -70,12 +69,12 @@ var reservedRangeSpecifiers = map[RangeSpecCode]struct{}{
 
 func rangeFieldConstructorFor(code RangeSpecCode) (rangeFieldConstructor, error) {
 	if _, invalid := reservedRangeSpecifiers[code]; invalid {
-		return nil, fmt.Errorf("range specifier code %d not valid", code)
+		return nil, fmt.Errorf("range specifier code %d not valid: %w", code, ErrInvalidQualifier)
 	}
 
 	constructor, ok := rangeFieldConstructors[code]
 	if !ok {
-		return nil, fmt.Errorf("unknown range specifier code %d", code)
+		return nil, fmt.Errorf("unknown range specifier code %d: %w", code, ErrInvalidQualifier)
 	}
 
 	return constructor, nil
@@ -98,9 +97,10 @@ func (rf *StartStopRangeField) SerializeTo() ([]byte, error) {
 	case 1:
 		if rf.Start > 0xFF || rf.Stop > 0xFF {
 			return nil, fmt.Errorf(
-				"values exceed 1-byte range: start=%d, stop=%d",
+				"values exceed 1-byte range: start=%d, stop=%d: %w",
 				rf.Start,
 				rf.Stop,
+				ErrValueOutOfRange,
 			)
 		}
 
@@ -108,9 +108,10 @@ func (rf *StartStopRangeField) SerializeTo() ([]byte, error) {
 	case 2:
 		if rf.Start > 0xFFFF || rf.Stop > 0xFFFF {
 			return nil, fmt.Errorf(
-				"values exceed 2-byte range: start=%d, stop=%d",
+				"values exceed 2-byte range: start=%d, stop=%d: %w",
 				rf.Start,
 				rf.Stop,
+				ErrValueOutOfRange,
 			)
 		}
 
@@ -120,7 +121,7 @@ func (rf *StartStopRangeField) SerializeTo() ([]byte, error) {
 		encoded = binary.LittleEndian.AppendUint32(encoded, rf.Start)
 		encoded = binary.LittleEndian.AppendUint32(encoded, rf.Stop)
 	default:
-		return nil, fmt.Errorf("invalid byte width %d", rf.byteWidth)
+		return nil, fmt.Errorf("invalid byte width %d: %w", rf.byteWidth, ErrInvalidLength)
 	}
 
 	return encoded, nil
@@ -129,7 +130,12 @@ func (rf *StartStopRangeField) SerializeTo() ([]byte, error) {
 func (rf *StartStopRangeField) DecodeFromBytes(data []byte) error {
 	expected := rf.byteWidth * 2
 	if len(data) != expected {
-		return fmt.Errorf("requires %d bytes, got %d", expected, len(data))
+		cause := ErrInvalidLength
+		if len(data) < expected {
+			cause = ErrInsufficientData
+		}
+
+		return fmt.Errorf("requires %d bytes, got %d: %w", expected, len(data), cause)
 	}
 
 	switch rf.byteWidth {
@@ -143,11 +149,16 @@ func (rf *StartStopRangeField) DecodeFromBytes(data []byte) error {
 		rf.Start = binary.LittleEndian.Uint32(data[0:4])
 		rf.Stop = binary.LittleEndian.Uint32(data[4:8])
 	default:
-		return fmt.Errorf("invalid byte width %d", rf.byteWidth)
+		return fmt.Errorf("invalid byte width %d: %w", rf.byteWidth, ErrInvalidLength)
 	}
 
 	if rf.Stop < rf.Start {
-		return fmt.Errorf("stop index %d precedes start index %d", rf.Stop, rf.Start)
+		return fmt.Errorf(
+			"stop index %d precedes start index %d: %w",
+			rf.Stop,
+			rf.Start,
+			ErrValueOutOfRange,
+		)
 	}
 
 	return nil
@@ -200,20 +211,28 @@ func (rf *CountRangeField) SerializeTo() ([]byte, error) {
 	switch rf.byteWidth {
 	case 1:
 		if rf.Count > 0xFF {
-			return nil, fmt.Errorf("count exceeds 1-byte range: %d", rf.Count)
+			return nil, fmt.Errorf(
+				"count exceeds 1-byte range: %d: %w",
+				rf.Count,
+				ErrValueOutOfRange,
+			)
 		}
 
 		encoded = append(encoded, byte(rf.Count))
 	case 2:
 		if rf.Count > 0xFFFF {
-			return nil, fmt.Errorf("count exceeds 2-byte range: %d", rf.Count)
+			return nil, fmt.Errorf(
+				"count exceeds 2-byte range: %d: %w",
+				rf.Count,
+				ErrValueOutOfRange,
+			)
 		}
 
 		encoded = binary.LittleEndian.AppendUint16(encoded, uint16(rf.Count))
 	case 4:
 		encoded = binary.LittleEndian.AppendUint32(encoded, rf.Count)
 	default:
-		return nil, fmt.Errorf("invalid byte width %d", rf.byteWidth)
+		return nil, fmt.Errorf("invalid byte width %d: %w", rf.byteWidth, ErrInvalidLength)
 	}
 
 	return encoded, nil
@@ -221,7 +240,12 @@ func (rf *CountRangeField) SerializeTo() ([]byte, error) {
 
 func (rf *CountRangeField) DecodeFromBytes(data []byte) error {
 	if len(data) != rf.byteWidth {
-		return fmt.Errorf("requires %d byte(s), got %d", rf.byteWidth, len(data))
+		cause := ErrInvalidLength
+		if len(data) < rf.byteWidth {
+			cause = ErrInsufficientData
+		}
+
+		return fmt.Errorf("requires %d byte(s), got %d: %w", rf.byteWidth, len(data), cause)
 	}
 
 	switch rf.byteWidth {
@@ -232,7 +256,7 @@ func (rf *CountRangeField) DecodeFromBytes(data []byte) error {
 	case 4:
 		rf.Count = binary.LittleEndian.Uint32(data[0:4])
 	default:
-		return fmt.Errorf("invalid byte width %d", rf.byteWidth)
+		return fmt.Errorf("invalid byte width %d: %w", rf.byteWidth, ErrInvalidLength)
 	}
 
 	return nil
@@ -272,7 +296,7 @@ func (rf *AllRangeField) SerializeTo() ([]byte, error) {
 
 func (rf *AllRangeField) DecodeFromBytes(data []byte) error {
 	if len(data) > 0 {
-		return errors.New("AllRangeField is an empty range field")
+		return fmt.Errorf("AllRangeField is an empty range field: %w", ErrInvalidLength)
 	}
 
 	return nil

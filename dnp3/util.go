@@ -149,8 +149,8 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 		end := min(offset+blockSize+crcSize, len(data))
 		if end-offset <= crcSize {
 			return nil, nil, fmt.Errorf(
-				"truncated block: %d trailing byte(s) cannot hold data plus a %d-byte CRC",
-				end-offset, crcSize)
+				"truncated block: %d trailing byte(s) cannot hold data plus a %d-byte CRC: %w",
+				end-offset, crcSize, ErrInsufficientData)
 		}
 
 		block := data[offset : end-crcSize]
@@ -159,8 +159,8 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 		calc := CalculateDNP3CRC(block)
 		if !slices.Equal(crc, calc) {
 			return nil, nil, fmt.Errorf(
-				"crc not correct for block: %X. Got %X, expected %X",
-				block, crc, calc)
+				"crc not correct for block: %X. Got %X, expected %X: %w",
+				block, crc, calc, ErrCRCMismatch)
 		}
 
 		clean = append(clean, block...)
@@ -172,7 +172,8 @@ func RemoveDNP3CRCs(data []byte) ([][]byte, []byte, error) {
 
 func BytesToDNP3TimeAbsolute(data []byte) (AbsoluteTime, error) {
 	if len(data) < 6 {
-		return AbsoluteTime{}, fmt.Errorf("absolute time requires 6 bytes, got %d", len(data))
+		return AbsoluteTime{}, fmt.Errorf("absolute time requires 6 bytes, got %d: %w",
+			len(data), ErrInsufficientData)
 	}
 
 	var padded [8]byte
@@ -180,11 +181,16 @@ func BytesToDNP3TimeAbsolute(data []byte) (AbsoluteTime, error) {
 
 	milliseconds := binary.LittleEndian.Uint64(padded[:])
 	if milliseconds > maxAbsoluteMilliseconds {
-		return AbsoluteTime{}, fmt.Errorf("absolute time overflow: %d", milliseconds)
+		return AbsoluteTime{}, fmt.Errorf(
+			"absolute time overflow: %d: %w",
+			milliseconds,
+			ErrValueOutOfRange,
+		)
 	}
 
 	if milliseconds > uint64(math.MaxInt64) {
-		return AbsoluteTime{}, fmt.Errorf("absolute time exceeds supported range: %d", milliseconds)
+		return AbsoluteTime{}, fmt.Errorf("absolute time exceeds supported range: %d: %w",
+			milliseconds, ErrValueOutOfRange)
 	}
 
 	return AbsoluteTime(time.UnixMilli(int64(milliseconds))), nil
@@ -193,9 +199,9 @@ func BytesToDNP3TimeAbsolute(data []byte) (AbsoluteTime, error) {
 func TimeAbsoluteToBytes(value AbsoluteTime) ([]byte, error) {
 	milliseconds := value.Time().UnixMilli()
 	if milliseconds < 0 {
-		return nil, fmt.Errorf("timestamp %v is negative", value)
+		return nil, fmt.Errorf("timestamp %v is negative: %w", value, ErrValueOutOfRange)
 	} else if milliseconds > int64(maxAbsoluteMilliseconds) {
-		return nil, fmt.Errorf("timestamp %v exceeds max DNP3 time", value)
+		return nil, fmt.Errorf("timestamp %v exceeds max DNP3 time: %w", value, ErrValueOutOfRange)
 	}
 	// #nosec G115 -- milliseconds range is clamped above
 	boundedMilliseconds := uint64(milliseconds)
@@ -209,7 +215,11 @@ func TimeAbsoluteToBytes(value AbsoluteTime) ([]byte, error) {
 
 func BytesToDNP3TimeRelative(data []byte) (RelativeTime, error) {
 	if len(data) < 2 {
-		return 0, fmt.Errorf("relative time requires 2 bytes, got %d", len(data))
+		return 0, fmt.Errorf(
+			"relative time requires 2 bytes, got %d: %w",
+			len(data),
+			ErrInsufficientData,
+		)
 	}
 
 	milliseconds := binary.LittleEndian.Uint16(data[:2])
@@ -222,9 +232,10 @@ func TimeRelativeToBytes(relativeTime RelativeTime) ([]byte, error) {
 	milliseconds := int64(relativeDuration / time.Millisecond)
 
 	if milliseconds < 0 {
-		return nil, fmt.Errorf("relative time %v is negative", relativeTime)
+		return nil, fmt.Errorf("relative time %v is negative: %w", relativeTime, ErrValueOutOfRange)
 	} else if milliseconds > maxRelativeMilliseconds {
-		return nil, fmt.Errorf("relative time %v exceeds max DNP3 relative time", relativeTime)
+		return nil, fmt.Errorf("relative time %v exceeds max DNP3 relative time: %w",
+			relativeTime, ErrValueOutOfRange)
 	}
 
 	// #nosec G115 -- milliseconds range is clamped above

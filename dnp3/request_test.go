@@ -1,6 +1,7 @@
 package dnp3_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/nblair2/go-dnp3/v4/dnp3"
@@ -27,8 +28,12 @@ func TestApplicationRequest_DecodeFromBytes_shortInput(t *testing.T) {
 			appreq := &dnp3.ApplicationRequest{}
 
 			err := appreq.DecodeFromBytes(testCase.input)
-			if err == nil {
-				t.Fatalf("DecodeFromBytes(%x): expected error, got nil", testCase.input)
+			if !errors.Is(err, dnp3.ErrInsufficientData) {
+				t.Fatalf(
+					"DecodeFromBytes(%x): got %v, want ErrInsufficientData",
+					testCase.input,
+					err,
+				)
 			}
 		})
 	}

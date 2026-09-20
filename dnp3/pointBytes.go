@@ -1,7 +1,6 @@
 package dnp3
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -264,14 +263,15 @@ func (p *PointBytes) GetValue() any {
 func (p *PointBytes) SetValue(value any) error {
 	val, ok := value.([]byte)
 	if !ok {
-		return fmt.Errorf("PointBytes value must be byte slice, got %T", value)
+		return fmt.Errorf("PointBytes value must be byte slice, got %T: %w", value, ErrInvalidType)
 	}
 
 	if p.expectedValueSize > 0 && len(val) != p.expectedValueSize {
 		return fmt.Errorf(
-			"PointBytes value incorrect size: expected %d, got %d (use ExpectedValueSize())",
+			"PointBytes value incorrect size: expected %d, got %d (use ExpectedValueSize()): %w",
 			p.expectedValueSize,
 			len(val),
+			ErrInvalidLength,
 		)
 	}
 
@@ -347,7 +347,8 @@ func (p *PointBytes) parseField(
 	switch field {
 	case pointFieldFlags:
 		if len(remaining) < 1 {
-			return nil, fmt.Errorf("not enough data for flags: need 1, have %d", len(remaining))
+			return nil, fmt.Errorf("not enough data for flags: need 1, have %d: %w",
+				len(remaining), ErrInsufficientData)
 		}
 
 		flags := PointFlags{}
@@ -363,10 +364,8 @@ func (p *PointBytes) parseField(
 
 	case pointFieldAbsTime:
 		if len(remaining) < 6 {
-			return nil, fmt.Errorf(
-				"not enough data for absolute time: need 6, have %d",
-				len(remaining),
-			)
+			return nil, fmt.Errorf("not enough data for absolute time: need 6, have %d: %w",
+				len(remaining), ErrInsufficientData)
 		}
 
 		absTime, err := BytesToDNP3TimeAbsolute(remaining[:6])
@@ -380,10 +379,8 @@ func (p *PointBytes) parseField(
 
 	case pointFieldRelTime:
 		if len(remaining) < 2 {
-			return nil, fmt.Errorf(
-				"not enough data for relative time: need 2, have %d",
-				len(remaining),
-			)
+			return nil, fmt.Errorf("not enough data for relative time: need 2, have %d: %w",
+				len(remaining), ErrInsufficientData)
 		}
 
 		relTime, err := BytesToDNP3TimeRelative(remaining[:2])
@@ -397,7 +394,8 @@ func (p *PointBytes) parseField(
 
 	case pointFieldStatus:
 		if len(remaining) < 1 {
-			return nil, fmt.Errorf("not enough data for status: need 1, have %d", len(remaining))
+			return nil, fmt.Errorf("not enough data for status: need 1, have %d: %w",
+				len(remaining), ErrInsufficientData)
 		}
 
 		status := CommandStatus(remaining[0])
@@ -411,9 +409,8 @@ func (p *PointBytes) parseField(
 
 		if valueWidth < 0 {
 			return nil, fmt.Errorf(
-				"not enough data for value: have %d, need at least %d for trailing fields",
-				len(remaining), suffixWidth,
-			)
+				"not enough data for value: have %d, need at least %d for trailing fields: %w",
+				len(remaining), suffixWidth, ErrInsufficientData)
 		}
 
 		p.Value = remaining[:valueWidth]
@@ -432,28 +429,40 @@ func (p *PointBytes) encodeField(field pointField) ([]byte, error) {
 	switch field {
 	case pointFieldFlags:
 		if p.Flags == nil {
-			return nil, errors.New("flags field is required by layout but is nil")
+			return nil, fmt.Errorf(
+				"flags field is required by layout but is nil: %w",
+				ErrMissingField,
+			)
 		}
 
 		return []byte{p.Flags.ToByte()}, nil
 
 	case pointFieldAbsTime:
 		if p.AbsoluteTime == nil {
-			return nil, errors.New("absolute time field is required by layout but is nil")
+			return nil, fmt.Errorf(
+				"absolute time field is required by layout but is nil: %w",
+				ErrMissingField,
+			)
 		}
 
 		return TimeAbsoluteToBytes(*p.AbsoluteTime)
 
 	case pointFieldRelTime:
 		if p.RelativeTime == nil {
-			return nil, errors.New("relative time field is required by layout but is nil")
+			return nil, fmt.Errorf(
+				"relative time field is required by layout but is nil: %w",
+				ErrMissingField,
+			)
 		}
 
 		return TimeRelativeToBytes(*p.RelativeTime)
 
 	case pointFieldStatus:
 		if p.Status == nil {
-			return nil, errors.New("status field is required by layout but is nil")
+			return nil, fmt.Errorf(
+				"status field is required by layout but is nil: %w",
+				ErrMissingField,
+			)
 		}
 
 		return []byte{byte(*p.Status)}, nil
@@ -573,7 +582,11 @@ func newPointsBytesVariable(
 	prefCode PointPrefixCode,
 ) ([]Point, int, error) {
 	if !slices.Contains([]PointPrefixCode{Size1Octet, Size2Octet, Size4Octet}, prefCode) {
-		return nil, 0, fmt.Errorf("variable-size points require a size prefix, got %s", prefCode)
+		return nil, 0, fmt.Errorf(
+			"variable-size points require a size prefix, got %s: %w",
+			prefCode,
+			ErrInvalidQualifier,
+		)
 	}
 
 	pointsOut := make([]Point, 0, num)
@@ -582,9 +595,8 @@ func newPointsBytesVariable(
 	for pointIndex := range num {
 		if len(data)-offset < prefSize {
 			return pointsOut, offset, fmt.Errorf(
-				"not enough bytes for point %d size prefix: need %d, have %d",
-				pointIndex, prefSize, len(data)-offset,
-			)
+				"not enough bytes for point %d size prefix: need %d, have %d: %w",
+				pointIndex, prefSize, len(data)-offset, ErrInsufficientData)
 		}
 
 		pointSize, err := prefixToInt(data[offset : offset+prefSize])
@@ -598,10 +610,14 @@ func newPointsBytesVariable(
 
 		valueOffset := offset + prefSize
 		if pointSize < 0 || pointSize > len(data)-valueOffset {
+			cause := ErrInsufficientData
+			if pointSize < 0 {
+				cause = ErrInvalidLength
+			}
+
 			return pointsOut, offset, fmt.Errorf(
-				"not enough bytes for point %d value: need %d, have %d",
-				pointIndex, pointSize, len(data)-valueOffset,
-			)
+				"not enough bytes for point %d value: need %d, have %d: %w",
+				pointIndex, pointSize, len(data)-valueOffset, cause)
 		}
 
 		pointEnd := valueOffset + pointSize
@@ -629,9 +645,8 @@ func newPointsBytesGeneric(
 	size := num * (prefSize + width)
 	if size > len(data) {
 		return nil, 0, fmt.Errorf(
-			"not enough bytes for %d %d-byte points with %d-byte prefix",
-			num, width, prefSize,
-		)
+			"not enough bytes for %d %d-byte points with %d-byte prefix: %w",
+			num, width, prefSize, ErrInsufficientData)
 	}
 
 	pointsOut := make([]Point, 0, num)
