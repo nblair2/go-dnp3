@@ -42,7 +42,7 @@ type Fragment struct {
 	Sequence    uint8       `json:"sequence"`    // transport SEQ of the FIR segment
 	Segments    int         `json:"segments"`    // link frames consumed
 	Data        []byte      `json:"data"`        // reassembled application bytes, CRCs removed
-	Application Application `json:"application"` // nil when Data could not be decoded
+	Application Application `json:"application"` // nil only when Data held no bytes to decode; may be partially decoded (see Assemble)
 }
 
 // String outputs the fragment as an indented string.
@@ -77,11 +77,14 @@ type fragmentState struct {
 // It returns (nil, nil) when the frame carried no transport segment, when the
 // segment was buffered but the fragment is still incomplete, or when a
 // completed fragment held no application bytes. It returns (fragment, nil)
-// once a fragment is complete and its application layer decoded, and
+// once a fragment is complete and its application layer fully decoded, and
 // (fragment, err) when the fragment is complete but the application decode
-// failed, in which case Data is still valid. It returns (nil, err) when the
-// segment violated the transport rules (ErrOrphanSegment, ErrSequenceMismatch,
-// ErrFragmentTooLarge); the segment and any fragment in progress are dropped.
+// failed partway through, in which case Data is still valid and Application
+// holds whatever objects decoded before the failure (with the undecoded
+// remainder preserved losslessly rather than nil). It returns (nil, err) when
+// the segment violated the transport rules (ErrOrphanSegment,
+// ErrSequenceMismatch, ErrFragmentTooLarge); the segment and any fragment in
+// progress are dropped.
 //
 //nolint:nilnil // (nil, nil) means "no fragment yet"; documented above.
 func (asm *Assembler) Assemble(frame *Frame) (*Fragment, error) {
@@ -138,6 +141,8 @@ func (asm *Assembler) Assemble(frame *Frame) (*Fragment, error) {
 // frame is fed. A parse error (malformed length or CRC) or an Assemble error
 // (ErrOrphanSegment, ErrSequenceMismatch, ErrFragmentTooLarge) stops
 // consumption and is returned with whatever frames and fragments came first.
+// If the fragment completing when the error occurred still decoded (fully or
+// partially — see Assemble), it is appended to fragments before returning.
 func (asm *Assembler) AssemblePayload(payload []byte) ([]*Frame, []*Fragment, []byte, error) {
 	frames, rest, err := ParseFrames(payload)
 
@@ -145,12 +150,12 @@ func (asm *Assembler) AssemblePayload(payload []byte) ([]*Frame, []*Fragment, []
 
 	for _, frame := range frames {
 		fragment, assembleErr := asm.Assemble(frame)
-		if assembleErr != nil {
-			return frames, fragments, rest, assembleErr
-		}
-
 		if fragment != nil {
 			fragments = append(fragments, fragment)
+		}
+
+		if assembleErr != nil {
+			return frames, fragments, rest, assembleErr
 		}
 	}
 
@@ -225,11 +230,17 @@ func (*Assembler) complete(key SessionKey, state *fragmentState, frame *Frame) (
 	}
 
 	err := app.DecodeFromBytes(fragment.Data)
+
+	// app is populated in place regardless of err: a decode failure partway
+	// through (e.g. an unsupported object) still leaves every object decoded
+	// before the failure point, plus the undecoded remainder preserved
+	// losslessly as Extra. Keep it on the fragment either way so callers can
+	// use what did decode instead of discarding the whole fragment.
+	fragment.Application = app
+
 	if err != nil {
 		return fragment, fmt.Errorf("error in DNP3 Application layer: %w", err)
 	}
-
-	fragment.Application = app
 
 	return fragment, nil
 }
